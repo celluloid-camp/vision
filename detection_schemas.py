@@ -1,5 +1,7 @@
-from typing import List, Dict
-from pydantic import BaseModel, Field
+from typing import List, Dict, Optional, Any
+from pydantic import BaseModel
+from datetime import datetime
+
 
 # --- Type definitions for detection results ---
 class BoundingBox(BaseModel):
@@ -8,6 +10,7 @@ class BoundingBox(BaseModel):
     width: int
     height: int
 
+
 class DetectionObject(BaseModel):
     id: str
     class_name: str
@@ -15,10 +18,12 @@ class DetectionObject(BaseModel):
     bbox: BoundingBox
     thumbnail: str
 
+
 class DetectionFrame(BaseModel):
     frame_idx: int
     timestamp: float
     objects: List[DetectionObject]
+
 
 class VideoMetadata(BaseModel):
     fps: float
@@ -27,14 +32,17 @@ class VideoMetadata(BaseModel):
     height: int
     source: str
 
+
 class ModelMetadata(BaseModel):
     name: str
     type: str
     version: str
 
+
 class SpriteMetadata(BaseModel):
     path: str
     thumbnail_size: List[int]
+
 
 class DetectionStatistics(BaseModel):
     total_detections: int
@@ -43,6 +51,7 @@ class DetectionStatistics(BaseModel):
     person_without_face: int
     other_detections: int
     class_counts: Dict[str, int]
+
 
 class ProcessingMetadata(BaseModel):
     start_time: str
@@ -53,13 +62,39 @@ class ProcessingMetadata(BaseModel):
     processing_speed: float
     detection_statistics: DetectionStatistics
 
+
 class ResultsMetadata(BaseModel):
     video: VideoMetadata
     model: ModelMetadata
     sprite: SpriteMetadata
     processing: ProcessingMetadata
 
+
 class DetectionResults(BaseModel):
     version: str
     metadata: ResultsMetadata
-    frames: List[DetectionFrame] 
+    frames: List[DetectionFrame]
+
+
+class JobStatus:
+    def __init__(
+        self,
+        job_id: str,
+        project_id: str,
+        video_url: str,
+        similarity_threshold: float,
+        callback_url: str = None,
+    ):
+        self.job_id = job_id
+        self.project_id = project_id
+        self.video_url = video_url
+        self.similarity_threshold = similarity_threshold
+        self.callback_url = callback_url
+        self.status = "queued"  # queued, processing, completed, failed
+        self.start_time: Optional[datetime] = None
+        self.end_time: Optional[datetime] = None
+        self.progress = 0.0
+        self.result_path: Optional[str] = None
+        self.error_message: Optional[str] = None
+        self.metadata: Dict[str, Any] = {}
+        self.queue_position = 0

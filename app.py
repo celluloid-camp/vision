@@ -14,10 +14,7 @@ from fastapi.security import APIKeyHeader
 from scalar_fastapi import get_scalar_api_reference
 
 # Import detection types
-from detection_schemas import DetectionResults
-
-# Import job types
-from job import JobStatus
+from detection_schemas import DetectionResults, JobStatus
 
 # Import Pydantic models
 from result_models import (
