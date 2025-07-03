@@ -20,16 +20,17 @@ echo "🏃 Starting container..."
 docker run -d \
     --name celluloid-video-analysis-api \
     --restart unless-stopped \
-    -p 8080:8080 \
+    -p 8081:8081 \
     -v "$(pwd)/outputs:/app/outputs" \
     -v "$(pwd)/models:/app/models:ro" \
-    -e REDIS_URL="redis://localhost:6379/0" \
+    -e REDIS_URL="redis://host.docker.internal:6379/0" \
+    -e API_KEY="xxx" \
     celluloid-video-analysis-api
 
 # Wait for service to be ready
 echo "⏳ Waiting for service to be ready..."
 for i in {1..30}; do
-    if curl -f http://localhost:8080/health > /dev/null 2>&1; then
+    if curl -f http://localhost:8081/health > /dev/null 2>&1; then
         echo "✅ Service is ready!"
         break
     fi

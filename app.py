@@ -404,8 +404,6 @@ async def health_check():
 async def start_detection(body: AnalysisRequest, key: Annotated[str, Depends(header_scheme)]):
     """Start video analysis on a video"""
 
-    print(f"key: {key}")
-    print(f"api_key: {api_key}")
     if key != api_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
 

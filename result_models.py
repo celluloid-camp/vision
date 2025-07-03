@@ -1,5 +1,7 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
+from urllib.parse import urlparse
+import os
 
 # --- Pydantic models for OpenAPI ---
 class HealthResponse(BaseModel):
@@ -17,6 +19,16 @@ class AnalysisRequest(BaseModel):
     video_url: str = Field(..., description="URL or path to video file")
     similarity_threshold: float = Field(0.5, ge=0, le=1, description="Similarity threshold for object tracking")
     callback_url: Optional[str] = Field(None, description="Callback URL for job completion notifications")
+
+    @field_validator("video_url")
+    @classmethod
+    def validate_video_url(cls, v):
+        from urllib.parse import urlparse
+        import os
+        result = urlparse(v)
+        if (result.scheme in ("http", "https") and result.netloc) or os.path.exists(v):
+            return v
+        raise ValueError("video_url must be a valid URL or an existing file path")
 
 class AnalysisResponse(BaseModel):
     job_id: str
