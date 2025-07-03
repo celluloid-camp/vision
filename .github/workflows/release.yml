@@ -1,0 +1,23 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Running release-it using GitHub Action
+        uses: juancarlosjr97/release-it-containerized:0.7.74
+        with:
+            github_token: ${{ secrets.GITHUB_TOKEN }}
+            plugins_list: "@release-it/conventional-changelog,@release-it/bumper"
