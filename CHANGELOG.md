@@ -3,6 +3,17 @@
 This changelog is auto generated using release-it.
 
 
+## [1.0.2](https://github.com/celluloid-camp/vision/compare/v1.0.1...v1.0.2) (2025-07-03)
+
+### Bug Fixes
+
+* add run app script ([a350b5b](https://github.com/celluloid-camp/vision/commit/a350b5b717ede15cfc2dbbbaf164b75d02d36882))
+
+### Chores
+
+* add samples ([c74b275](https://github.com/celluloid-camp/vision/commit/c74b275ef32cf1439ae9137faa08e6a054f779f5))
+* add samples ([b3f7c94](https://github.com/celluloid-camp/vision/commit/b3f7c94d1e595fb1564a6009f95233c9725d215b))
+
 ## 1.0.1 (2025-07-03)
 
 ### Bug Fixes
