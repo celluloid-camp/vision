@@ -17,7 +17,7 @@ jobs:
           fetch-depth: 0
 
       - name: Running release-it using GitHub Action
-        uses: juancarlosjr97/release-it-containerized:0.7.74
+        uses: juancarlosjr97/release-it-containerized
         with:
             github_token: ${{ secrets.GITHUB_TOKEN }}
             plugins_list: "@release-it/conventional-changelog,@release-it/bumper"
