@@ -5,11 +5,11 @@
       "push": true,
       "requireCommits": true,
       "requireCommitsFail": false,
-      "tagName": "${version}"
+      "tagName": "v${version}"
   },
   "github": {
       "release": true,
-      "releaseName": "${version}",
+      "releaseName": "v${version}",
       "comments": {
           "submit": true
       }
