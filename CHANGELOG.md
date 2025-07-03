@@ -3,6 +3,12 @@
 This changelog is auto generated using release-it.
 
 
+## [1.0.4](https://github.com/celluloid-camp/vision/compare/v1.0.3...v1.0.4) (2025-07-03)
+
+### Chores
+
+* change lint ([f1e643e](https://github.com/celluloid-camp/vision/commit/f1e643e530a8eb4b0c5e453c3301c54f18203085))
+
 ## [1.0.3](https://github.com/celluloid-camp/vision/compare/v1.0.2...v1.0.3) (2025-07-03)
 
 ### Bug Fixes
