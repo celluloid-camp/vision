@@ -1,3 +1,4 @@
+---
 name: Release
 on:
   push:
@@ -8,7 +9,7 @@ permissions:
   packages: write
 
 jobs:
-  test:
+  release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -16,8 +17,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Running release-it using GitHub Action
-        uses: juancarlosjr97/release-it-containerized
+      - name: Running release-it 
+        uses: juancarlosjr97/release-it-containerized@0.7.74
         with:
             github_token: ${{ secrets.GITHUB_TOKEN }}
             plugins_list: "@release-it/conventional-changelog,@release-it/bumper"
