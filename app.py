@@ -1,7 +1,7 @@
 import os
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 import uuid
 import asyncio
 from typing import Annotated, Dict, Optional
@@ -27,22 +27,13 @@ from result_models import (
     JobStatusResponse,
     JobsListResponse,
     QueueStatusResponse,
-    DeleteJobResponse,
     DetectionResultsModel,
 )
 
 # Import the object detection functionality from root directory
-from detect_objects import ObjectDetector, download_video
+from detect_objects import download_video
 
 from dotenv import load_dotenv
-
-load_dotenv()
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-api_key = os.getenv("API_KEY")
-
 
 # Import the RQ job manager
 from rq_queue import RQJobManager
@@ -52,9 +43,17 @@ from results_index import update_result_index, get_result_from_index
 
 
 # --- FastAPI integration ---
-from fastapi import Depends, FastAPI, HTTPException, Query, BackgroundTasks
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+
+
+load_dotenv()
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+api_key = os.getenv("API_KEY")
 
 
 # Initialize RQ job manager
@@ -80,7 +79,7 @@ async def lifespan(app: FastAPI):
     # Test Redis connection
     try:
         job_manager.redis_conn.ping()
-        logger.info(f"Connected to Redis")
+        logger.info("Connected to Redis")
     except Exception as e:
         logger.error(f"Failed to connect to Redis: {str(e)}")
         raise
@@ -316,10 +315,6 @@ async def send_callback(
                             )
                             return
                         else:
-                            logger.warning(
-                                f"Callback failed with status {response.status}: {await response.text()} (attempt {attempt + 1})"
-                            )
-
                             # Don't retry on client errors (4xx) except 408, 429
                             if (
                                 400 <= response.status < 500
@@ -694,9 +689,3 @@ async def scalar_html():
         openapi_url=app.openapi_url,
         title=app.title,
     )
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run("app:app", host="0.0.0.0", port=8081, reload=False, log_level="info")
