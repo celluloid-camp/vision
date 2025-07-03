@@ -22,3 +22,5 @@ jobs:
         with:
             github_token: ${{ secrets.PROJECT_GITHUB_TOKEN }}
             plugins_list: "@release-it/conventional-changelog,@release-it/bumper"
+            git_username: github-actions[bot]
+            git_email: github-actions[bot]@users.noreply.github.com
