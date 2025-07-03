@@ -37,6 +37,12 @@ from detect_objects import ObjectDetector, download_video
 from dotenv import load_dotenv
 
 load_dotenv()
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+api_key = os.getenv("API_KEY")
+
 
 # Import the RQ job manager
 from rq_queue import RQJobManager
@@ -44,9 +50,6 @@ from rq_queue import RQJobManager
 # Import persistent results index helpers
 from results_index import update_result_index, get_result_from_index
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # --- FastAPI integration ---
 from fastapi import Depends, FastAPI, HTTPException, Query, BackgroundTasks
@@ -398,10 +401,12 @@ async def health_check():
     status_code=202,
     summary="Analyse a video",
 )
-async def start_detection(body: AnalysisRequest, key: str = Annotated[str, Depends(header_scheme)]):
+async def start_detection(body: AnalysisRequest, key: Annotated[str, Depends(header_scheme)]):
     """Start video analysis on a video"""
 
-    if key != os.getenv("API_KEY"):
+    print(f"key: {key}")
+    print(f"api_key: {api_key}")
+    if key != api_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
     try:
@@ -502,14 +507,14 @@ async def get_job_status(job_id: str):
             job_info = get_result_from_index(job_id)
             if not job_info:
                 raise HTTPException(status_code=404, detail="Job not found")
-            # Compose a minimal JobStatusResponse from index
+            # Compose a minimal JobStatusResponse from index with valid types
             return {
                 "job_id": job_id,
-                "project_id": None,
-                "video_url": None,
-                "similarity_threshold": None,
-                "status": job_info.get("status"),
-                "progress": None,
+                "project_id": "",
+                "video_url": "",
+                "similarity_threshold": 0.0,
+                "status": job_info.get("status", "unknown"),
+                "progress": 0.0,
                 "queue_position": None,
                 "estimated_wait_time": None,
                 "start_time": None,
@@ -573,13 +578,13 @@ async def get_job_results(job_id: str):
 
 @app.get("/jobs", response_model=JobsListResponse)
 async def list_jobs(
+    key: Annotated[str, Depends(header_scheme)],
     project_id: Optional[str] = Query(None, description="Filter by project ID"),
-    status: Optional[str] = Query(None, description="Filter by status"),
-    key: str = Annotated[str, Depends(header_scheme)]
+    status: Optional[str] = Query(None, description="Filter by status")
 ):
     """List all jobs with optional filtering"""
 
-    if key != os.getenv("API_KEY"):
+    if key != api_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
     try:
@@ -630,53 +635,12 @@ async def list_jobs(
         raise HTTPException(status_code=500, detail=f"Error listing jobs: {str(e)}")
 
 
-@app.delete("/jobs/{job_id}", response_model=DeleteJobResponse)
-async def delete_job(job_id: str, key: str = Annotated[str, Depends(header_scheme)]):
-    """Delete a job and its results"""
-
-    if key != os.getenv("API_KEY"):
-        raise HTTPException(status_code=401, detail="Invalid API key")
-
-    try:
-        # Get job metadata from RQ
-        job = job_manager.get_job_from_rq(job_id)
-        if not job:
-            raise HTTPException(status_code=404, detail="Job not found")
-
-        # Check if job is currently processing
-        if job.status == "processing":
-            raise HTTPException(
-                status_code=400, detail="Cannot delete job that is currently processing"
-            )
-
-        # Try to cancel the job if it's queued
-        job_manager.cancel_job(job_id)
-
-        # Delete result file if it exists
-        if job.result_path and os.path.exists(job.result_path):
-            try:
-                os.remove(job.result_path)
-                logger.info(f"Deleted result file: {job.result_path}")
-            except Exception as e:
-                logger.warning(f"Failed to delete result file: {str(e)}")
-
-        # Delete job from RQ
-        job_manager.delete_job(job_id)
-
-        return {"message": "Job deleted successfully"}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting job: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error deleting job: {str(e)}")
-
-
 @app.get("/queue", response_model=QueueStatusResponse)
-async def get_queue_status(key: str = Annotated[str, Depends(header_scheme)]):
+async def get_queue_status(key: Annotated[str, Depends(header_scheme)]):
     """Get detailed queue status"""
 
-    if key != os.getenv("API_KEY"):
+    if key != api_key:
+        raise HTTPException(status_code=401, detail="Invalid API key")
     try:
         queue_status = job_manager.get_queue_status_info()
 
