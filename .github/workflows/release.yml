@@ -20,5 +20,5 @@ jobs:
       - name: Running release-it 
         uses: juancarlosjr97/release-it-containerized@0.7.74
         with:
-            github_token: ${{ secrets.GITHUB_TOKEN }}
+            github_token: ${{ secrets.PROJECT_GITHUB_TOKEN }}
             plugins_list: "@release-it/conventional-changelog,@release-it/bumper"
