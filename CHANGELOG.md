@@ -2,6 +2,22 @@
 
 This changelog is auto generated using release-it.
 
+
+## [1.0.3](https://github.com/celluloid-camp/vision/compare/v1.0.2...v1.0.3) (2025-07-03)
+
+### Bug Fixes
+
+* add formater ([f216856](https://github.com/celluloid-camp/vision/commit/f21685603ac86cbbf8c1656ae26a8624ba6b59ee))
+* update container build ([562924d](https://github.com/celluloid-camp/vision/commit/562924d38fa935339616cd7c473eb951b7725403))
+* update container build ([d504097](https://github.com/celluloid-camp/vision/commit/d504097ee1fdfe1d55e17865abf60191aad7fe0d))
+* validate video url ([88f823d](https://github.com/celluloid-camp/vision/commit/88f823da69871cc0989dc11026b64e8761c29e61))
+
+### Chores
+
+* change lint ([1d050a2](https://github.com/celluloid-camp/vision/commit/1d050a2d0b569d6507da9cb1004355fc312ba393))
+* change lint ([4c399c5](https://github.com/celluloid-camp/vision/commit/4c399c5e3ca9f2105a839ae96dc96fd62252b7e1))
+* change lint ([9b2e8df](https://github.com/celluloid-camp/vision/commit/9b2e8df6923fa2f406df3966a703959c52c96256))
+
 ## [1.0.2](https://github.com/celluloid-camp/vision/compare/v1.0.1...v1.0.2) (2025-07-03)
 
 ### Bug Fixes
