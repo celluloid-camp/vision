@@ -11,6 +11,7 @@ import aiofiles
 from contextlib import asynccontextmanager
 from concurrent.futures import ProcessPoolExecutor
 from fastapi.security import APIKeyHeader
+from pydantic import BaseModel
 from scalar_fastapi import get_scalar_api_reference
 
 # Import detection types
@@ -37,6 +38,8 @@ from rq_queue import RQJobManager
 
 # Import persistent results index helpers
 from results_index import update_result_index, get_result_from_index
+
+from utils import get_version
 
 
 # --- FastAPI integration ---
@@ -94,10 +97,29 @@ async def lifespan(app: FastAPI):
     process_pool.shutdown(wait=True)
 
 
+tags_metadata = [
+    {
+        "name": "analysis",
+        "description": "Operations with video analysis.",
+    },
+    {
+        "name": "health",
+        "description": "Health check operations.",
+    },
+    {
+        "name": "status",
+        "description": "Status check operations.",
+    },
+    {
+        "name": "results",
+        "description": "Results operations.",
+    },
+]
+
 # Create FastAPI app
 app = FastAPI(
     title="Celluloid Video Analysis API",
-    version="1.0.0",
+    version=get_version(),
     lifespan=lifespan,
     servers=[
         {
@@ -105,6 +127,7 @@ app = FastAPI(
             "description": "Production environment",
         },
     ],
+    openapi_tags=tags_metadata,
 )
 
 
@@ -264,6 +287,21 @@ async def process_rq_jobs():
             await asyncio.sleep(5)  # Wait longer on error
 
 
+class JobCompletedWebhook(BaseModel):
+    job_id: str
+    project_id: str
+    status: str
+    timestamp: datetime
+
+
+@app.webhooks.post("job-completed")
+def job_completed(body: JobCompletedWebhook):
+    """
+    When a job is completed, we'll send you a POST request with this
+    data to the URL that you register for the event `job-completed` in the dashboard.
+    """
+
+
 async def send_callback(
     job: JobStatus, status: str, results: Dict = None, error: str = None
 ):
@@ -290,7 +328,6 @@ async def send_callback(
         # Simple headers without authentication
         headers = {
             "Content-Type": "application/json",
-            "User-Agent": "MediaPipe-ObjectDetection-Service/1.0",
         }
 
         # Send POST request to callback URL with retry logic

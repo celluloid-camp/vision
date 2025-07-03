@@ -7,7 +7,7 @@ from rq import Queue
 from rq.job import Job
 from rq.registry import FailedJobRegistry, FinishedJobRegistry
 
-from job import JobStatus
+from detection_schemas import JobStatus  # type: ignore
 
 # Set up logging
 logger = logging.getLogger(__name__)
