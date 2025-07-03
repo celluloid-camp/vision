@@ -348,7 +348,7 @@ async def send_callback(
         logger.error(traceback.format_exc())
 
 
-@app.get("/health", response_model=HealthResponse)
+@app.get("/health", response_model=HealthResponse, tags=["health"])
 async def health_check():
     """Health check endpoint"""
     try:
@@ -400,6 +400,7 @@ async def health_check():
     response_model=AnalysisResponse,
     status_code=202,
     summary="Analyse a video",
+    tags=["analysis"],
 )
 async def start_detection(
     body: AnalysisRequest, key: Annotated[str, Depends(header_scheme)]
@@ -495,7 +496,12 @@ async def start_detection(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@app.get("/status/{job_id}", response_model=JobStatusResponse)
+@app.get(
+    "/status/{job_id}",
+    response_model=JobStatusResponse,
+    summary="Get the status of a detection job",
+    tags=["status"],
+)
 async def get_job_status(job_id: str):
     """Get the status of a detection job"""
     try:
@@ -551,7 +557,12 @@ async def get_job_status(job_id: str):
         )
 
 
-@app.get("/results/{job_id}", response_model=DetectionResultsModel)
+@app.get(
+    "/results/{job_id}",
+    response_model=DetectionResultsModel,
+    summary="Get the results of a completed detection job",
+    tags=["results"],
+)
 async def get_job_results(job_id: str):
     """Get the results of a completed detection job"""
     try:
@@ -578,7 +589,7 @@ async def get_job_results(job_id: str):
         raise HTTPException(status_code=500, detail=f"Error reading results: {str(e)}")
 
 
-@app.get("/jobs", response_model=JobsListResponse)
+@app.get("/jobs", response_model=JobsListResponse, include_in_schema=False)
 async def list_jobs(
     key: Annotated[str, Depends(header_scheme)],
     project_id: Optional[str] = Query(None, description="Filter by project ID"),
@@ -637,7 +648,7 @@ async def list_jobs(
         raise HTTPException(status_code=500, detail=f"Error listing jobs: {str(e)}")
 
 
-@app.get("/queue", response_model=QueueStatusResponse)
+@app.get("/queue", response_model=QueueStatusResponse, include_in_schema=False)
 async def get_queue_status(key: Annotated[str, Depends(header_scheme)]):
     """Get detailed queue status"""
 
