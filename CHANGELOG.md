@@ -3,6 +3,12 @@
 This changelog is auto generated using release-it.
 
 
+## [1.0.6](https://github.com/celluloid-camp/vision/compare/v1.0.5...v1.0.6) (2025-07-03)
+
+### Chores
+
+* add api tags ([1f12a34](https://github.com/celluloid-camp/vision/commit/1f12a34338af9d4ce54256e76dbb5210154d1e82))
+
 ## [1.0.5](https://github.com/celluloid-camp/vision/compare/v1.0.4...v1.0.5) (2025-07-03)
 
 ### Chores
