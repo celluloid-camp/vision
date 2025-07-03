@@ -3,6 +3,16 @@
 This changelog is auto generated using release-it.
 
 
+## [1.0.5](https://github.com/celluloid-camp/vision/compare/v1.0.4...v1.0.5) (2025-07-03)
+
+### Chores
+
+* fix release ([39c78b1](https://github.com/celluloid-camp/vision/commit/39c78b147e196b6ab4b3d1658b0c577769df9575))
+
+### Code Refactoring
+
+* merge types ([049eba8](https://github.com/celluloid-camp/vision/commit/049eba8d7ce9902fb0b2b148a25b5967c86c281a))
+
 ## [1.0.4](https://github.com/celluloid-camp/vision/compare/v1.0.3...v1.0.4) (2025-07-03)
 
 ### Chores
