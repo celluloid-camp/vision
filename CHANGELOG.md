@@ -3,6 +3,14 @@
 This changelog is auto generated using release-it.
 
 
+## [1.0.3](https://github.com/celluloid-camp/vision/compare/v1.0.2...v1.0.3) (2025-07-03)
+
+### Bug Fixes
+
+* update container build ([562924d](https://github.com/celluloid-camp/vision/commit/562924d38fa935339616cd7c473eb951b7725403))
+* update container build ([d504097](https://github.com/celluloid-camp/vision/commit/d504097ee1fdfe1d55e17865abf60191aad7fe0d))
+* validate video url ([88f823d](https://github.com/celluloid-camp/vision/commit/88f823da69871cc0989dc11026b64e8761c29e61))
+
 ## [1.0.2](https://github.com/celluloid-camp/vision/compare/v1.0.1...v1.0.2) (2025-07-03)
 
 ### Bug Fixes
