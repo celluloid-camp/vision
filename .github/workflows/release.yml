@@ -4,10 +4,6 @@ on:
   push:
     branches: ["main"]
 
-permissions:
-  contents: read
-  packages: write
-
 jobs:
   release:
     runs-on: ubuntu-latest
