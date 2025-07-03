@@ -99,9 +99,17 @@ async def lifespan(app: FastAPI):
 
 
 # Create FastAPI app
-app = FastAPI(title="Celluloid Video Analysis API", version="1.0.0", lifespan=lifespan, servers=[
-        {"url": "https://analysis.celluloid.me", "description": "Production environment"},
-    ],)
+app = FastAPI(
+    title="Celluloid Video Analysis API",
+    version="1.0.0",
+    lifespan=lifespan,
+    servers=[
+        {
+            "url": "https://analysis.celluloid.me",
+            "description": "Production environment",
+        },
+    ],
+)
 
 
 header_scheme = APIKeyHeader(name="x-api-key")
@@ -401,7 +409,9 @@ async def health_check():
     status_code=202,
     summary="Analyse a video",
 )
-async def start_detection(body: AnalysisRequest, key: Annotated[str, Depends(header_scheme)]):
+async def start_detection(
+    body: AnalysisRequest, key: Annotated[str, Depends(header_scheme)]
+):
     """Start video analysis on a video"""
 
     if key != api_key:
@@ -562,9 +572,11 @@ async def get_job_results(job_id: str):
             if not result_data:
                 raise HTTPException(status_code=404, detail="Job not found")
         else:
-             raise HTTPException(status_code=500, detail="Job queued")
+            raise HTTPException(status_code=500, detail="Job queued")
         if not result_data:
-            raise HTTPException(status_code=404, detail="Result file not found or invalid")
+            raise HTTPException(
+                status_code=404, detail="Result file not found or invalid"
+            )
         return result_data
 
     except HTTPException:
@@ -578,7 +590,7 @@ async def get_job_results(job_id: str):
 async def list_jobs(
     key: Annotated[str, Depends(header_scheme)],
     project_id: Optional[str] = Query(None, description="Filter by project ID"),
-    status: Optional[str] = Query(None, description="Filter by status")
+    status: Optional[str] = Query(None, description="Filter by status"),
 ):
     """List all jobs with optional filtering"""
 
