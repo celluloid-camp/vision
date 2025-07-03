@@ -10,16 +10,20 @@ on:
   push:
     tags: 
       - "v*"
+  release:
+    types: [published]      
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout repository or tag
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.release.tag_name || github.ref_name }}
+          
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
