@@ -18,7 +18,7 @@ Video detection and analysis application powered by MediaPipe and scenedetect. F
 ### Starting the Service
 
 ```bash
-python app.py
+python run_app.py
 ```
 
 The service will start on `http://localhost:8081`
