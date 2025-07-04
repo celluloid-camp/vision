@@ -3,6 +3,12 @@
 This changelog is auto generated using release-it.
 
 
+## [1.0.9](https://github.com/celluloid-camp/vision/compare/v1.0.8...v1.0.9) (2025-07-04)
+
+### Bug Fixes
+
+* add tag to webhook endpoint ([abd78b0](https://github.com/celluloid-camp/vision/commit/abd78b01d542340f0e15d23d6f6625697602cdf9))
+
 ## [1.0.8](https://github.com/celluloid-camp/vision/compare/v1.0.7...v1.0.8) (2025-07-04)
 
 ### Chores
