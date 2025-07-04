@@ -3,6 +3,12 @@
 This changelog is auto generated using release-it.
 
 
+## [1.0.8](https://github.com/celluloid-camp/vision/compare/v1.0.7...v1.0.8) (2025-07-04)
+
+### Chores
+
+* add utils ([ea30f16](https://github.com/celluloid-camp/vision/commit/ea30f1672728ec3a2ae438b84dd332a27159b451))
+
 ## [1.0.7](https://github.com/celluloid-camp/vision/compare/v1.0.6...v1.0.7) (2025-07-03)
 
 ## [1.0.6](https://github.com/celluloid-camp/vision/compare/v1.0.5...v1.0.6) (2025-07-03)
