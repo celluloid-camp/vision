@@ -114,6 +114,10 @@ tags_metadata = [
         "name": "results",
         "description": "Results operations.",
     },
+    {
+        "name": "webhooks",
+        "description": "Webhook operations.",
+    },
 ]
 
 # Create FastAPI app
@@ -294,7 +298,7 @@ class JobCompletedWebhook(BaseModel):
     timestamp: datetime
 
 
-@app.webhooks.post("job-completed")
+@app.webhooks.post("job-completed", tags=["webhooks"])
 def job_completed(body: JobCompletedWebhook):
     """
     When a job is completed, we'll send you a POST request with this
