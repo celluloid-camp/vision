@@ -3,6 +3,12 @@
 This changelog is auto generated using release-it.
 
 
+## [1.0.11](https://github.com/celluloid-camp/vision/compare/v1.0.10...v1.0.11) (2025-07-08)
+
+### Bug Fixes
+
+* check video format before process ([4129d10](https://github.com/celluloid-camp/vision/commit/4129d1059e617124c7203d2bd7af21f64464ee76))
+
 ## [1.0.10](https://github.com/celluloid-camp/vision/compare/v1.0.9...v1.0.10) (2025-07-08)
 
 ### Chores
