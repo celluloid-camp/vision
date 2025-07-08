@@ -127,10 +127,11 @@ app = FastAPI(
     lifespan=lifespan,
     servers=[
         {
-            "url": "https://analysis.celluloid.me",
+            "url": "https://vision.celluloid.me",
             "description": "Production environment",
         },
     ],
+    root_path="/",
     openapi_tags=tags_metadata,
 )
 
