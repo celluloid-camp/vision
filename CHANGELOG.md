@@ -3,6 +3,12 @@
 This changelog is auto generated using release-it.
 
 
+## [1.0.10](https://github.com/celluloid-camp/vision/compare/v1.0.9...v1.0.10) (2025-07-08)
+
+### Chores
+
+* fix openapi root_path ([c8fb3cf](https://github.com/celluloid-camp/vision/commit/c8fb3cfdf40eafc3fe1295e1affd02cd08ddf338))
+
 ## [1.0.9](https://github.com/celluloid-camp/vision/compare/v1.0.8...v1.0.9) (2025-07-04)
 
 ### Bug Fixes
