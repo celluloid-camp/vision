@@ -44,8 +44,8 @@ docker ps --filter name=celluloid-video-analysis-api
 
 echo ""
 echo "🎉 Deployment complete!"
-echo "📡 API is available at: http://localhost:8080"
-echo "🔍 Health check at: http://localhost:8080/health"
+echo "📡 API is available at: http://localhost:8081"
+echo "🔍 Health check at: http://localhost:8081/health"
 echo ""
 echo "📋 Useful commands:"
 echo "   View logs: docker logs -f celluloid-video-analysis-api"

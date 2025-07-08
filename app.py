@@ -28,6 +28,9 @@ from result_models import (
     DetectionResultsModel,
 )
 
+# Validate video file with OpenCV
+import cv2
+
 # Import the object detection functionality from root directory
 from detect_objects import download_video
 
@@ -46,6 +49,7 @@ from utils import get_version
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 
 
 load_dotenv()
@@ -125,14 +129,8 @@ app = FastAPI(
     title="Celluloid Video Analysis API",
     version=get_version(),
     lifespan=lifespan,
-    servers=[
-        {
-            "url": "https://vision.celluloid.me",
-            "description": "Production environment",
-        },
-    ],
-    root_path="/",
     openapi_tags=tags_metadata,
+    root_path="/",
 )
 
 
@@ -199,6 +197,16 @@ async def process_video_job(job: JobStatus):
         else:
             video_path = job.video_url
 
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            raise ValueError("Video file not valid")
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if frame_count == 0:
+            raise ValueError(
+                f"Video contains no video stream (only audio?): {video_path}"
+            )
+        cap.release()
+
         # Process the video in a separate process
         loop = asyncio.get_event_loop()
         results: DetectionResults = await loop.run_in_executor(
@@ -253,6 +261,11 @@ async def process_video_job(job: JobStatus):
         job.error_message = str(e)
 
         job_manager.save_job_to_rq(job)  # Save failure status to RQ
+
+        # Update persistent results index with failed status and error info
+        update_result_index(
+            job.job_id, None, job.status, {"error_message": job.error_message}
+        )
 
         logger.error(f"Job {job.job_id} failed: {str(e)}")
         logger.error(traceback.format_exc())
@@ -606,7 +619,6 @@ async def get_job_status(job_id: str):
     tags=["results"],
 )
 async def get_job_results(job_id: str):
-    """Get the results of a completed detection job"""
     try:
         # Get job metadata from RQ
         job = job_manager.get_job_from_rq(job_id)
@@ -621,6 +633,17 @@ async def get_job_results(job_id: str):
         if not result_data:
             raise HTTPException(
                 status_code=404, detail="Result file not found or invalid"
+            )
+        if result_data.get("status") == "failed":
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "job_id": job_id,
+                    "status": "failed",
+                    "error_message": result_data.get("metadata", {}).get(
+                        "error_message", "Unknown error"
+                    ),
+                },
             )
         return result_data
 
