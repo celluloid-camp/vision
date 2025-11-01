@@ -3,6 +3,16 @@
 This changelog is auto generated using release-it.
 
 
+## [1.1.0](https://github.com/celluloid-camp/vision/compare/v1.0.11...v1.1.0) (2025-11-01)
+
+### Features
+
+* add API documentation and improve project structure ([2299c22](https://github.com/celluloid-camp/vision/commit/2299c22a92a17633d3caf388639842ff3bb6e2cb))
+
+### Chores
+
+* add more info about celluloid vision ([6acc152](https://github.com/celluloid-camp/vision/commit/6acc15217863523a2b5560f985ae7197f208b31f))
+
 ## [1.0.11](https://github.com/celluloid-camp/vision/compare/v1.0.10...v1.0.11) (2025-07-08)
 
 ### Bug Fixes
