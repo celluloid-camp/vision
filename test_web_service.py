@@ -16,6 +16,7 @@ BASE_URL = "http://localhost:8081"
 CALLBACK_PORT = 8082
 CALLBACK_URL = f"http://localhost:8082/callback"
 
+API_KEY = "xxx"
 
 TEST_VIDEO_URL = "https://video.mshparisnord.fr/static/streaming-playlists/hls/eff0a3a5-5b2a-4e7b-b6e7-177198779081/8e8d5317-431c-4661-90d7-a6f62f1b6641-720-fragmented.mp4"
 
@@ -122,7 +123,7 @@ def test_start_detection():
         response = requests.post(
             f"{BASE_URL}/analyse",
             json=request_data,
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json", "x-api-key": API_KEY}
         )
         
         if response.status_code == 202:
@@ -183,7 +184,7 @@ def test_list_jobs():
     print("\nTesting list jobs...")
     
     try:
-        response = requests.get(f"{BASE_URL}/jobs")
+        response = requests.get(f"{BASE_URL}/jobs", headers={"x-api-key": API_KEY})
         
         if response.status_code == 200:
             data = response.json()
@@ -206,7 +207,7 @@ def test_queue_status():
     print("\nTesting queue status...")
     
     try:
-        response = requests.get(f"{BASE_URL}/queue")
+        response = requests.get(f"{BASE_URL}/queue", headers={"x-api-key": API_KEY})
         
         if response.status_code == 200:
             data = response.json()

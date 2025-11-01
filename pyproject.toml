@@ -1,0 +1,49 @@
+[project]
+name = "celluloid-vision"
+version = "0.1.0"
+description = "Video detection and analysis application powered by MediaPipe and scenedetect"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "opencv-python>=4.8.0",
+    "mediapipe>=0.10.0",
+    "numpy>=1.24.0",
+    "requests>=2.31.0",
+    "Pillow>=10.0.0",
+    "matplotlib>=3.7.0",
+    "fastapi==0.104.1",
+    "python-dotenv>=1.0.0",
+    "asgiref>=3.8.1",
+    "hypercorn==0.15.0",
+    "aiohttp>=3.9.1",
+    "aiofiles==23.2.1",
+    "scalar-fastapi==1.0.3",
+    "rq>=1.15.1",
+    "redis>=5.0.1",
+    "uvicorn>=0.34.3",
+    "scenedetect==0.6.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=24.0.0",
+    "flake8>=7.0.0",
+]
+
+[tool.setuptools]
+py-modules = [
+    "app",
+    "detect_objects",
+    "detection_schemas",
+    "result_models",
+    "results_index",
+    "rq_queue",
+    "scenes",
+    "test_web_service",
+    "utils",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+

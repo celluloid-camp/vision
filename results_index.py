@@ -4,6 +4,7 @@ from typing import Optional, Dict, Any
 
 INDEX_PATH = os.path.join("outputs", "job_index.json")
 
+
 def update_result_index(job_id: str, result_path: str, status: str, metadata: dict):
     """Update the persistent job index with job result info."""
     try:
@@ -22,6 +23,7 @@ def update_result_index(job_id: str, result_path: str, status: str, metadata: di
     except Exception as e:
         print(f"Failed to update job index: {e}")
 
+
 def get_result_from_index(job_id: str) -> Optional[Dict[str, Any]]:
     """Retrieve DetectionResultsModel-compatible dict from the persistent job index by job_id."""
     if os.path.exists(INDEX_PATH):
@@ -36,4 +38,7 @@ def get_result_from_index(job_id: str) -> Optional[Dict[str, Any]]:
                         return json.load(rf)
                     except Exception:
                         return None
-    return None 
+            # If job failed (no result_path), return the job_info itself
+            if job_info.get("status") == "failed":
+                return job_info
+    return None

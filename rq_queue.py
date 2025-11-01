@@ -3,26 +3,26 @@ from datetime import datetime, timedelta
 import os
 from typing import Optional, List
 import redis
-from rq import Queue, Worker
+from rq import Queue
 from rq.job import Job
 from rq.registry import FailedJobRegistry, FinishedJobRegistry
 
-from job import JobStatus
+from detection_schemas import JobStatus  # type: ignore
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
 # Redis and RQ configuration from environment variables
-REDIS_URL = os.getenv('REDIS_URL')
+REDIS_URL = os.getenv("REDIS_URL")
 if not REDIS_URL:
     raise ValueError("REDIS_URL environment variable is required but not set")
 
-RQ_QUEUE_NAME = os.getenv('RQ_QUEUE_NAME', 'celluloid_video_processing')
-RQ_JOB_TIMEOUT = int(os.getenv('RQ_JOB_TIMEOUT', 3600))
+RQ_QUEUE_NAME = os.getenv("RQ_QUEUE_NAME", "celluloid_video_processing")
+RQ_JOB_TIMEOUT = int(os.getenv("RQ_JOB_TIMEOUT", 3600))
+
 
 class RQJobManager:
     def __init__(self, redis_url: str = REDIS_URL, queue_name: str = RQ_QUEUE_NAME):
-
         """Initialize RQ job manager"""
         self.redis_url = redis_url
         self.queue_name = queue_name

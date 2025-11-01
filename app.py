@@ -1,7 +1,7 @@
 import os
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 import uuid
 import asyncio
 from typing import Annotated, Dict, Optional
@@ -11,13 +11,11 @@ import aiofiles
 from contextlib import asynccontextmanager
 from concurrent.futures import ProcessPoolExecutor
 from fastapi.security import APIKeyHeader
+from pydantic import BaseModel
 from scalar_fastapi import get_scalar_api_reference
 
 # Import detection types
-from detection_schemas import DetectionResults
-
-# Import job types
-from job import JobStatus
+from detection_schemas import DetectionResults, JobStatus
 
 # Import Pydantic models
 from result_models import (
@@ -27,16 +25,16 @@ from result_models import (
     JobStatusResponse,
     JobsListResponse,
     QueueStatusResponse,
-    DeleteJobResponse,
     DetectionResultsModel,
 )
 
+# Validate video file with OpenCV
+import cv2
+
 # Import the object detection functionality from root directory
-from detect_objects import ObjectDetector, download_video
+from detect_objects import download_video
 
 from dotenv import load_dotenv
-
-load_dotenv()
 
 # Import the RQ job manager
 from rq_queue import RQJobManager
@@ -44,14 +42,22 @@ from rq_queue import RQJobManager
 # Import persistent results index helpers
 from results_index import update_result_index, get_result_from_index
 
+from utils import get_version
+
+
+# --- FastAPI integration ---
+from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
+
+
+load_dotenv()
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- FastAPI integration ---
-from fastapi import Depends, FastAPI, HTTPException, Query, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+api_key = os.getenv("API_KEY")
 
 
 # Initialize RQ job manager
@@ -66,7 +72,7 @@ process_pool = ProcessPoolExecutor(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    logger.info("Starting up FastAPI web service with RQ...")
+    logger.info("Starting up FastAPI web service with RQ... API key: %s", api_key)
 
     # Create output directory
     os.makedirs("outputs", exist_ok=True)
@@ -77,7 +83,7 @@ async def lifespan(app: FastAPI):
     # Test Redis connection
     try:
         job_manager.redis_conn.ping()
-        logger.info(f"Connected to Redis")
+        logger.info("Connected to Redis")
     except Exception as e:
         logger.error(f"Failed to connect to Redis: {str(e)}")
         raise
@@ -95,10 +101,37 @@ async def lifespan(app: FastAPI):
     process_pool.shutdown(wait=True)
 
 
+tags_metadata = [
+    {
+        "name": "analysis",
+        "description": "Operations with video analysis.",
+    },
+    {
+        "name": "health",
+        "description": "Health check operations.",
+    },
+    {
+        "name": "status",
+        "description": "Status check operations.",
+    },
+    {
+        "name": "results",
+        "description": "Results operations.",
+    },
+    {
+        "name": "webhooks",
+        "description": "Webhook operations.",
+    },
+]
+
 # Create FastAPI app
-app = FastAPI(title="Celluloid Video Analysis API", version="1.0.0", lifespan=lifespan, servers=[
-        {"url": "https://analysis.celluloid.me", "description": "Production environment"},
-    ],)
+app = FastAPI(
+    title="Celluloid Video Analysis API",
+    version=get_version(),
+    lifespan=lifespan,
+    openapi_tags=tags_metadata,
+    root_path="/",
+)
 
 
 header_scheme = APIKeyHeader(name="x-api-key")
@@ -164,6 +197,16 @@ async def process_video_job(job: JobStatus):
         else:
             video_path = job.video_url
 
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            raise ValueError("Video file not valid")
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if frame_count == 0:
+            raise ValueError(
+                f"Video contains no video stream (only audio?): {video_path}"
+            )
+        cap.release()
+
         # Process the video in a separate process
         loop = asyncio.get_event_loop()
         results: DetectionResults = await loop.run_in_executor(
@@ -180,6 +223,7 @@ async def process_video_job(job: JobStatus):
         async with aiofiles.open(output_path, "w") as f:
             await f.write(json.dumps(results, indent=2))
 
+        logger.info(f"Result file saved to: {output_path}")
         job.status = "completed"
         job.end_time = datetime.now()
         job.result_path = output_path
@@ -219,6 +263,11 @@ async def process_video_job(job: JobStatus):
 
         job_manager.save_job_to_rq(job)  # Save failure status to RQ
 
+        # Update persistent results index with failed status and error info
+        update_result_index(
+            job.job_id, None, job.status, {"error_message": job.error_message}
+        )
+
         logger.error(f"Job {job.job_id} failed: {str(e)}")
         logger.error(traceback.format_exc())
 
@@ -257,6 +306,21 @@ async def process_rq_jobs():
             await asyncio.sleep(5)  # Wait longer on error
 
 
+class JobCompletedWebhook(BaseModel):
+    job_id: str
+    project_id: str
+    status: str
+    timestamp: datetime
+
+
+@app.webhooks.post("job-completed", tags=["webhooks"])
+def job_completed(body: JobCompletedWebhook):
+    """
+    When a job is completed, we'll send you a POST request with this
+    data to the URL that you register for the event `job-completed` in the dashboard.
+    """
+
+
 async def send_callback(
     job: JobStatus, status: str, results: Dict = None, error: str = None
 ):
@@ -283,7 +347,6 @@ async def send_callback(
         # Simple headers without authentication
         headers = {
             "Content-Type": "application/json",
-            "User-Agent": "MediaPipe-ObjectDetection-Service/1.0",
         }
 
         # Send POST request to callback URL with retry logic
@@ -305,10 +368,6 @@ async def send_callback(
                             )
                             return
                         else:
-                            logger.warning(
-                                f"Callback failed with status {response.status}: {await response.text()} (attempt {attempt + 1})"
-                            )
-
                             # Don't retry on client errors (4xx) except 408, 429
                             if (
                                 400 <= response.status < 500
@@ -345,7 +404,7 @@ async def send_callback(
         logger.error(traceback.format_exc())
 
 
-@app.get("/health", response_model=HealthResponse)
+@app.get("/health", response_model=HealthResponse, tags=["health"])
 async def health_check():
     """Health check endpoint"""
     try:
@@ -397,12 +456,16 @@ async def health_check():
     response_model=AnalysisResponse,
     status_code=202,
     summary="Analyse a video",
+    tags=["analysis"],
 )
-async def start_detection(body: AnalysisRequest, key: str = Annotated[str, Depends(header_scheme)]):
+async def start_detection(
+    body: AnalysisRequest, key: Annotated[str, Depends(header_scheme)]
+):
     """Start video analysis on a video"""
 
-    if key != os.getenv("API_KEY"):
-        raise HTTPException(status_code=401, detail="Invalid API key")
+    if key != api_key:
+        logger.error(f"Invalid API key: {key}")
+        raise HTTPException(status_code=401, detail=f"Invalid API key: {key}    ")
 
     try:
         # Check if there's already a job for this project_id
@@ -490,7 +553,12 @@ async def start_detection(body: AnalysisRequest, key: str = Annotated[str, Depen
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@app.get("/status/{job_id}", response_model=JobStatusResponse)
+@app.get(
+    "/status/{job_id}",
+    response_model=JobStatusResponse,
+    summary="Get the status of a detection job",
+    tags=["status"],
+)
 async def get_job_status(job_id: str):
     """Get the status of a detection job"""
     try:
@@ -502,14 +570,14 @@ async def get_job_status(job_id: str):
             job_info = get_result_from_index(job_id)
             if not job_info:
                 raise HTTPException(status_code=404, detail="Job not found")
-            # Compose a minimal JobStatusResponse from index
+            # Compose a minimal JobStatusResponse from index with valid types
             return {
                 "job_id": job_id,
-                "project_id": None,
-                "video_url": None,
-                "similarity_threshold": None,
-                "status": job_info.get("status"),
-                "progress": None,
+                "project_id": "",
+                "video_url": "",
+                "similarity_threshold": 0.0,
+                "status": job_info.get("status", "unknown"),
+                "progress": 0.0,
                 "queue_position": None,
                 "estimated_wait_time": None,
                 "start_time": None,
@@ -546,9 +614,13 @@ async def get_job_status(job_id: str):
         )
 
 
-@app.get("/results/{job_id}", response_model=DetectionResultsModel)
+@app.get(
+    "/results/{job_id}",
+    response_model=DetectionResultsModel,
+    summary="Get the results of a completed detection job",
+    tags=["results"],
+)
 async def get_job_results(job_id: str):
-    """Get the results of a completed detection job"""
     try:
         # Get job metadata from RQ
         job = job_manager.get_job_from_rq(job_id)
@@ -559,9 +631,22 @@ async def get_job_results(job_id: str):
             if not result_data:
                 raise HTTPException(status_code=404, detail="Job not found")
         else:
-             raise HTTPException(status_code=500, detail="Job queued")
+            raise HTTPException(status_code=500, detail="Job queued")
         if not result_data:
-            raise HTTPException(status_code=404, detail="Result file not found or invalid")
+            raise HTTPException(
+                status_code=404, detail="Result file not found or invalid"
+            )
+        if result_data.get("status") == "failed":
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "job_id": job_id,
+                    "status": "failed",
+                    "error_message": result_data.get("metadata", {}).get(
+                        "error_message", "Unknown error"
+                    ),
+                },
+            )
         return result_data
 
     except HTTPException:
@@ -571,15 +656,15 @@ async def get_job_results(job_id: str):
         raise HTTPException(status_code=500, detail=f"Error reading results: {str(e)}")
 
 
-@app.get("/jobs", response_model=JobsListResponse)
+@app.get("/jobs", response_model=JobsListResponse, include_in_schema=False)
 async def list_jobs(
+    key: Annotated[str, Depends(header_scheme)],
     project_id: Optional[str] = Query(None, description="Filter by project ID"),
     status: Optional[str] = Query(None, description="Filter by status"),
-    key: str = Annotated[str, Depends(header_scheme)]
 ):
     """List all jobs with optional filtering"""
 
-    if key != os.getenv("API_KEY"):
+    if key != api_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
     try:
@@ -630,53 +715,12 @@ async def list_jobs(
         raise HTTPException(status_code=500, detail=f"Error listing jobs: {str(e)}")
 
 
-@app.delete("/jobs/{job_id}", response_model=DeleteJobResponse)
-async def delete_job(job_id: str, key: str = Annotated[str, Depends(header_scheme)]):
-    """Delete a job and its results"""
-
-    if key != os.getenv("API_KEY"):
-        raise HTTPException(status_code=401, detail="Invalid API key")
-
-    try:
-        # Get job metadata from RQ
-        job = job_manager.get_job_from_rq(job_id)
-        if not job:
-            raise HTTPException(status_code=404, detail="Job not found")
-
-        # Check if job is currently processing
-        if job.status == "processing":
-            raise HTTPException(
-                status_code=400, detail="Cannot delete job that is currently processing"
-            )
-
-        # Try to cancel the job if it's queued
-        job_manager.cancel_job(job_id)
-
-        # Delete result file if it exists
-        if job.result_path and os.path.exists(job.result_path):
-            try:
-                os.remove(job.result_path)
-                logger.info(f"Deleted result file: {job.result_path}")
-            except Exception as e:
-                logger.warning(f"Failed to delete result file: {str(e)}")
-
-        # Delete job from RQ
-        job_manager.delete_job(job_id)
-
-        return {"message": "Job deleted successfully"}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting job: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error deleting job: {str(e)}")
-
-
-@app.get("/queue", response_model=QueueStatusResponse)
-async def get_queue_status(key: str = Annotated[str, Depends(header_scheme)]):
+@app.get("/queue", response_model=QueueStatusResponse, include_in_schema=False)
+async def get_queue_status(key: Annotated[str, Depends(header_scheme)]):
     """Get detailed queue status"""
 
-    if key != os.getenv("API_KEY"):
+    if key != api_key:
+        raise HTTPException(status_code=401, detail="Invalid API key")
     try:
         queue_status = job_manager.get_queue_status_info()
 
@@ -720,9 +764,3 @@ async def scalar_html():
         openapi_url=app.openapi_url,
         title=app.title,
     )
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run("app:app", host="0.0.0.0", port=8081, reload=False, log_level="info")
