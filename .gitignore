@@ -121,6 +121,10 @@ poetry.lock
 # PEP 582
 __pypackages__/
 
+# uv
+.uv/
+uv.lock
+
 # Celery stuff
 celerybeat-schedule
 celerybeat.pid
@@ -180,3 +184,4 @@ src/images/
 src/models/*.tflite
 models/
 outputs/
+include

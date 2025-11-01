@@ -72,7 +72,7 @@ process_pool = ProcessPoolExecutor(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    logger.info("Starting up FastAPI web service with RQ...")
+    logger.info("Starting up FastAPI web service with RQ... API key: %s", api_key)
 
     # Create output directory
     os.makedirs("outputs", exist_ok=True)
@@ -223,6 +223,7 @@ async def process_video_job(job: JobStatus):
         async with aiofiles.open(output_path, "w") as f:
             await f.write(json.dumps(results, indent=2))
 
+        logger.info(f"Result file saved to: {output_path}")
         job.status = "completed"
         job.end_time = datetime.now()
         job.result_path = output_path
@@ -463,7 +464,8 @@ async def start_detection(
     """Start video analysis on a video"""
 
     if key != api_key:
-        raise HTTPException(status_code=401, detail="Invalid API key")
+        logger.error(f"Invalid API key: {key}")
+        raise HTTPException(status_code=401, detail=f"Invalid API key: {key}    ")
 
     try:
         # Check if there's already a job for this project_id
