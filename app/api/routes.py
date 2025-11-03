@@ -10,7 +10,6 @@ from fastapi.security import APIKeyHeader
 
 from app.core.config import API_KEY
 from app.core.dependencies import job_manager
-from app.core.background import send_callback
 from app.models.result_models import (
     HealthResponse,
     AnalysisRequest,
