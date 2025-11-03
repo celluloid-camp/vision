@@ -92,7 +92,7 @@ async def start_detection(
 
     if key != API_KEY:
         logger.error(f"Invalid API key: {key}")
-        raise HTTPException(status_code=401, detail=f"Invalid API key: {key}    ")
+        raise HTTPException(status_code=401, detail=f"Invalid API key: {key}")
 
     try:
         # Check if there's already a job for this project_id
