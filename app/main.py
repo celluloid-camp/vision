@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup
     api_key = os.getenv("API_KEY")
-    logger.info("Starting up FastAPI web service with RQ... API key: %s", api_key)
+    logger.info("Starting up FastAPI web service with RQ... API key configured: %s", "Yes" if api_key else "No")
 
     # Create output directory
     os.makedirs("outputs", exist_ok=True)

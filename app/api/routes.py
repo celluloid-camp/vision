@@ -69,7 +69,7 @@ async def health_check():
         return {
             "status": "unhealthy",
             "timestamp": datetime.now().isoformat(),
-            "error": str(e),
+            "error": "Health check failed",
             "redis_connected": False,
             "queue_size": 0,
             "processing_jobs": 0,
