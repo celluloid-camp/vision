@@ -171,13 +171,15 @@ uv run python test_web_service.py
 
 ### Models Used
 - Object detection: efficientdet_lite0
-- Face detection: BlazeFace
+- Face detection: BlazeFace (integrated within person detection workflow)
 - Models downloaded automatically on first use
+- Focus: Person detection with face detection to distinguish persons with/without faces
 
 ### Detection Parameters
 - `similarity_threshold`: Object tracking threshold (0.0-1.0, default: 0.5)
-- Higher threshold = stricter matching between frames
-- Lower threshold = more lenient tracking
+- Higher threshold (0.7-0.9) = stricter matching between frames, requires more visual similarity for tracking the same object across frames, reduces false positives but may lose track more easily
+- Lower threshold (0.3-0.5) = more lenient tracking, maintains tracking even with appearance changes, may have more false positives but better continuity
+- Recommended: 0.5 for general use, 0.7+ for static cameras, 0.3-0.4 for dynamic scenes
 
 ## Best Practices
 
@@ -252,7 +254,8 @@ uv run python test_web_service.py
 1. Update function signatures in `detect_objects.py`
 2. Update `AnalysisRequest` model in `result_models.py`
 3. Update API documentation in `Api.md`
-4. Test with various parameter values
+4. Update or add tests in `test_web_service.py` to validate new parameters
+5. Test with various parameter values to ensure backward compatibility
 
 ## Deployment
 
