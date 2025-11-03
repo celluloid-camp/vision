@@ -32,7 +32,6 @@ dev = [
 
 [tool.setuptools]
 py-modules = [
-    "app",
     "detect_objects",
     "detection_schemas",
     "result_models",
@@ -42,6 +41,7 @@ py-modules = [
     "test_web_service",
     "utils",
 ]
+packages = ["app"]
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
