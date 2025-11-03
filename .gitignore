@@ -182,6 +182,6 @@ detections*.json
 detection_exports/
 src/images/
 src/models/*.tflite
-models/
+/models/
 outputs/
 include
