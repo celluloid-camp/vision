@@ -45,22 +45,22 @@ Run video analysis directly using Python without starting the API server:
 
 ```bash
 # Basic usage
-python detect.py path/to/video.mp4
+python analyse.py path/to/video.mp4
 
 # Or with a video URL
-python detect.py https://example.com/video.mp4
+python analyse.py https://example.com/video.mp4
 
 # With custom output file
-python detect.py video.mp4 --output results.json
+python analyse.py video.mp4 --output results.json
 
 # With custom confidence threshold
-python detect.py video.mp4 --min-score 0.9
+python analyse.py video.mp4 --min-score 0.9
 
 # With custom similarity threshold for tracking
-python detect.py video.mp4 --similarity-threshold 0.7
+python analyse.py video.mp4 --similarity-threshold 0.7
 
 # Combine options
-python detect.py video.mp4 --output results.json --min-score 0.85 --similarity-threshold 0.6
+python analyse.py video.mp4 --output results.json --min-score 0.85 --similarity-threshold 0.6
 ```
 
 **Available Options:**

@@ -32,7 +32,7 @@ dev = [
 
 [tool.setuptools]
 py-modules = [
-    "detect",
+    "analyse",
     "run_app",
 ]
 packages = ["app"]
