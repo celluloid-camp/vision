@@ -39,9 +39,47 @@ Features person detection, tracking and timeline visualization.
 
 ## Usage
 
-### Starting the Service
+### Option 1: Command-Line Video Analysis (Recommended for Single Files)
 
-#### Option 1: Using uv run (Recommended)
+Run video analysis directly using Python without starting the API server:
+
+```bash
+# Basic usage
+python detect_objects.py path/to/video.mp4
+
+# Or with a video URL
+python detect_objects.py https://example.com/video.mp4
+
+# With custom output file
+python detect_objects.py video.mp4 --output results.json
+
+# With custom confidence threshold
+python detect_objects.py video.mp4 --min-score 0.9
+
+# With custom similarity threshold for tracking
+python detect_objects.py video.mp4 --similarity-threshold 0.7
+
+# Combine options
+python detect_objects.py video.mp4 --output results.json --min-score 0.85 --similarity-threshold 0.6
+```
+
+**Available Options:**
+- `--output`, `-o`: Output JSON file path (default: `detections.json`)
+- `--min-score`, `-s`: Minimum confidence score for detections, 0.0 to 1.0 (default: `0.8`)
+- `--similarity-threshold`: Similarity threshold for object tracking, 0.0 to 1.0 (default: `0.5`)
+
+The script will:
+- Download the video if a URL is provided
+- Process each frame for object detection
+- Track objects across frames
+- Generate a sprite sheet of detected objects
+- Save results to a JSON file with metadata
+
+### Option 2: API Server (for Multiple Jobs and Queuing)
+
+Start the FastAPI web service for processing multiple videos with job queuing:
+
+#### Using uv run (Recommended)
 
 Run directly with uv. It will automatically use Python 3.12 as specified in
 `pyproject.toml`:
