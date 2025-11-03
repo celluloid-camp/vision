@@ -6,7 +6,7 @@ load_dotenv()
 
 # API Configuration
 API_KEY = os.getenv("API_KEY")
-API_VERSION = "1.0.0"
+API_VERSION = "1.0.1"
 
 # Server Configuration
 HOST = "0.0.0.0"
