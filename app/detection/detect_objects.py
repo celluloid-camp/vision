@@ -19,7 +19,7 @@ import atexit
 from PIL import Image
 
 # Import detection types
-from detection_schemas import (
+from app.models.schemas import (
     DetectionResults,
 )
 

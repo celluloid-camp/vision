@@ -32,14 +32,8 @@ dev = [
 
 [tool.setuptools]
 py-modules = [
-    "detect_objects",
-    "detection_schemas",
-    "result_models",
-    "results_index",
-    "rq_queue",
-    "scenes",
-    "test_web_service",
-    "utils",
+    "detect",
+    "run_app",
 ]
 packages = ["app"]
 

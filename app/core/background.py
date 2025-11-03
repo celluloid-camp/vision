@@ -12,8 +12,8 @@ from concurrent.futures import ProcessPoolExecutor
 
 from app.models.schemas import DetectionResults, JobStatus
 from app.core.dependencies import job_manager
-from detect_objects import download_video, ObjectDetector
-from results_index import update_result_index
+from app.detection.detect_objects import download_video, ObjectDetector
+from app.core.results_index import update_result_index
 
 logger = logging.getLogger(__name__)
 

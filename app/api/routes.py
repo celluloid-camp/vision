@@ -20,7 +20,7 @@ from app.models.result_models import (
     DetectionResultsModel,
 )
 from app.models.schemas import JobStatus
-from results_index import get_result_from_index
+from app.core.results_index import get_result_from_index
 
 logger = logging.getLogger(__name__)
 

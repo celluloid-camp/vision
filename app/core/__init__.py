@@ -7,6 +7,9 @@ from app.core.background import (
     send_callback,
     shutdown_process_pool,
 )
+from app.core.utils import get_version
+from app.core.results_index import update_result_index, get_result_from_index
+from app.core.rq_queue import RQJobManager
 
 __all__ = [
     "API_KEY",
@@ -20,4 +23,8 @@ __all__ = [
     "process_video_job",
     "send_callback",
     "shutdown_process_pool",
+    "get_version",
+    "update_result_index",
+    "get_result_from_index",
+    "RQJobManager",
 ]
