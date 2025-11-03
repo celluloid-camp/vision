@@ -61,9 +61,11 @@ outputs/
 *.temp
 temp/
 
-# Documentation
-README.md
-*.md
+# Documentation (exclude all except README.md which is needed for build)
+# README.md is required by pyproject.toml
+CHANGELOG.md
+README-fr.md
+Api.md
 
 # Test files
 test_web_service.py
