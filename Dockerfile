@@ -39,13 +39,15 @@ RUN apt-get update && apt-get install -y \
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-# Copy dependency files for better caching
-COPY pyproject.toml ./
+# Copy dependency files and package structure for better caching
+COPY pyproject.toml README.md ./
+COPY app ./app
+COPY analyse.py run_app.py ./
 
 # Install Python dependencies using uv
 RUN uv pip install --system --no-cache -e .
 
-# Copy application code
+# Copy remaining application code
 COPY . .
 
 # Create outputs directory
