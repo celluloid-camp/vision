@@ -26,7 +26,7 @@ if __name__ == "__main__":
     logger.info("🔍 Redis URL: %s", os.getenv("REDIS_URL"))
 
     uvicorn.run(
-        "app.main:app",
+        "app:app",
         host="0.0.0.0",
         port=8081,
         reload=True,  # Enable auto-reload for development
