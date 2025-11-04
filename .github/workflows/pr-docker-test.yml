@@ -1,0 +1,98 @@
+---
+name: PR Docker Build and Test
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '**.py'
+      - 'Dockerfile'
+      - 'pyproject.toml'
+      - '.github/workflows/pr-docker-test.yml'
+
+jobs:
+  docker-build-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: vision:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          
+      - name: Start Redis container
+        run: |
+          docker run -d --name redis \
+            --network bridge \
+            -p 6379:6379 \
+            redis:7-alpine
+          
+      - name: Wait for Redis to be ready
+        run: |
+          timeout 30 bash -c 'until docker exec redis redis-cli ping | grep -q PONG; do sleep 1; done'
+          echo "Redis is ready"
+          
+      - name: Start application container
+        run: |
+          docker run -d --name vision-app \
+            --network bridge \
+            -p 8081:8081 \
+            -e REDIS_URL=redis://172.17.0.1:6379 \
+            -e API_KEY=test-key-for-ci \
+            vision:test
+          
+      - name: Wait for application to be ready
+        run: |
+          echo "Waiting for application to start..."
+          timeout 60 bash -c 'until curl -f http://localhost:8081/health 2>/dev/null; do sleep 2; done'
+          echo "Application is ready"
+          
+      - name: Test health endpoint
+        run: |
+          response=$(curl -s http://localhost:8081/health)
+          echo "Health check response: $response"
+          
+          # Check if response contains "healthy" status
+          if echo "$response" | grep -q '"status":"healthy"'; then
+            echo "✓ Health check passed"
+          else
+            echo "✗ Health check failed"
+            exit 1
+          fi
+          
+      - name: Test API documentation endpoint
+        run: |
+          http_code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/)
+          echo "API docs HTTP status: $http_code"
+          
+          if [ "$http_code" = "200" ]; then
+            echo "✓ API documentation endpoint accessible"
+          else
+            echo "✗ API documentation endpoint failed"
+            exit 1
+          fi
+          
+      - name: Show application logs on failure
+        if: failure()
+        run: |
+          echo "=== Application logs ==="
+          docker logs vision-app
+          echo "=== Redis logs ==="
+          docker logs redis
+          
+      - name: Cleanup containers
+        if: always()
+        run: |
+          docker stop vision-app redis || true
+          docker rm vision-app redis || true

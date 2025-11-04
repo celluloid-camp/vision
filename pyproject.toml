@@ -32,16 +32,10 @@ dev = [
 
 [tool.setuptools]
 py-modules = [
-    "app",
-    "detect_objects",
-    "detection_schemas",
-    "result_models",
-    "results_index",
-    "rq_queue",
-    "scenes",
-    "test_web_service",
-    "utils",
+    "analyse",
+    "run_app",
 ]
+packages = ["app"]
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]

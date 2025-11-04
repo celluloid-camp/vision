@@ -39,13 +39,15 @@ RUN apt-get update && apt-get install -y \
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-# Copy dependency files for better caching
-COPY pyproject.toml ./
+# Copy dependency files and package structure for better caching
+COPY pyproject.toml README.md ./
+COPY app ./app
+COPY analyse.py run_app.py ./
 
 # Install Python dependencies using uv
 RUN uv pip install --system --no-cache -e .
 
-# Copy application code
+# Copy remaining application code
 COPY . .
 
 # Create outputs directory
@@ -64,5 +66,5 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8081/health || exit 1
 
 # Run the startup script
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8081"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8081"]
 

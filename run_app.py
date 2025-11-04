@@ -16,6 +16,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 # Add current directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -24,7 +25,6 @@ if __name__ == "__main__":
     logger.info("📡 API will be available at: http://localhost:8081")
     logger.info("🔍 Health check at: http://localhost:8081/health")
     logger.info("🔍 Redis URL: %s", os.getenv("REDIS_URL"))
-
     uvicorn.run(
         "app:app",
         host="0.0.0.0",
