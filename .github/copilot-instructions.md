@@ -65,15 +65,44 @@ The project uses Lefthook for pre-commit hooks:
 ## Architecture and Design Patterns
 
 ### Project Structure
+
+The project uses a flat structure with all Python modules in the root directory:
+
+**Core Application Files:**
 - `app.py`: FastAPI application with API endpoints
+- `run_app.py`: Entry point script to start the application with Uvicorn
 - `detect_objects.py`: Core object detection logic using MediaPipe
 - `scenes.py`: Scene detection functionality using scenedetect
 - `rq_queue.py`: RQ job manager for async processing
+
+**Data Models:**
 - `detection_schemas.py`: Pydantic models for detection data structures
 - `result_models.py`: Pydantic models for API request/response
+
+**Utilities:**
 - `results_index.py`: Persistent results storage helpers
-- `test_web_service.py`: Integration test suite
 - `utils.py`: Shared utility functions
+
+**Testing:**
+- `test_web_service.py`: Integration test suite
+
+**Configuration Files:**
+- `pyproject.toml`: Python project configuration and dependencies
+- `lefthook.yml`: Pre-commit hooks configuration
+- `.flake8`: Flake8 linting configuration
+- `env.example`: Example environment variables
+- `Dockerfile`: Container configuration for deployment
+- `deploy.sh`: Deployment script
+
+**Documentation:**
+- `README.md`: Main project documentation
+- `README-fr.md`: French documentation
+- `Api.md`: API endpoint documentation
+- `CHANGELOG.md`: Version history
+
+**Directories:**
+- `.github/workflows/`: CI/CD workflows (build.yml, release.yml)
+- `samples/`: Sample detection results and sprite images
 
 ### Key Components
 
