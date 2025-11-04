@@ -181,7 +181,6 @@ Desktop.ini
 detections*.json
 detection_exports/
 src/images/
-src/models/*.tflite
-/models/
+models/*.tflite
 outputs/
 include
