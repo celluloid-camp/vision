@@ -3,6 +3,18 @@
 This changelog is auto generated using release-it.
 
 
+## [1.1.1](https://github.com/celluloid-camp/vision/compare/v1.1.0...v1.1.1) (2025-11-04)
+
+### Code Refactoring
+
+* Create app folder structure with separate FastAPI modules ([a91949e](https://github.com/celluloid-camp/vision/commit/a91949ebc1096657ce52463de544e529652ef3fb))
+* Move all Python files into app/ package structure ([0804ad1](https://github.com/celluloid-camp/vision/commit/0804ad1844afec938baf6e9bb70b3aac75435729))
+* Update Uvicorn app import path and rename scene detection function for clarity ([4c8977e](https://github.com/celluloid-camp/vision/commit/4c8977ea52fc4053deaf85337f55d733844a39a1))
+
+### Code Style Changes
+
+* Clean up whitespace in run_app.py for improved readability ([8dc5bc7](https://github.com/celluloid-camp/vision/commit/8dc5bc7d86e0f969cbd29c30d3326956add4c2f5))
+
 ## [1.1.0](https://github.com/celluloid-camp/vision/compare/v1.0.11...v1.1.0) (2025-11-01)
 
 ### Features
