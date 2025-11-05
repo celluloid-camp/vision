@@ -3,6 +3,8 @@
 This changelog is auto generated using release-it.
 
 
+## [1.1.2](https://github.com/celluloid-camp/vision/compare/v1.1.1...v1.1.2) (2025-11-05)
+
 ## [1.1.1](https://github.com/celluloid-camp/vision/compare/v1.1.0...v1.1.1) (2025-11-04)
 
 ### Code Refactoring
