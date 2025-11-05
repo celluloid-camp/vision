@@ -4,24 +4,18 @@
     "config:recommended"
   ],
   "enabledManagers": [
-    "pyproject"
+    "pep621"
   ],
-  "python": {
-    "enabled": true,
-    "fileMatch": [
-      "^pyproject\\.toml$"
-    ]
-  },
   "packageRules": [
     {
-      "matchManagers": ["pyproject"],
+      "matchManagers": ["pep621"],
       "groupName": "minor and patch updates",
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true,
       "schedule": ["before 10am on monday"]
     },
     {
-      "matchManagers": ["pyproject"],
+      "matchManagers": ["pep621"],
       "matchUpdateTypes": ["major"],
       "automerge": false,
       "labels": ["dependencies", "major-update"]
