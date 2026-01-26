@@ -3,6 +3,12 @@
 This changelog is auto generated using release-it.
 
 
+## [1.1.4](https://github.com/celluloid-camp/vision/compare/v1.1.3...v1.1.4) (2026-01-26)
+
+### Bug Fixes
+
+* **deps:** update dependency scalar-fastapi to v1.6.1 ([#13](https://github.com/celluloid-camp/vision/issues/13)) ([4c16a27](https://github.com/celluloid-camp/vision/commit/4c16a277cd08077227a20585d31b8a96871a147a))
+
 ## [1.1.3](https://github.com/celluloid-camp/vision/compare/v1.1.2...v1.1.3) (2026-01-14)
 
 ### Bug Fixes
