@@ -1,5 +1,5 @@
 """Shared dependencies and services"""
-from app.core.rq_queue import RQJobManager
+from app.core.celery_queue import CeleryJobManager
 
-# Initialize RQ job manager (singleton)
-job_manager = RQJobManager()
+# Initialize Celery job manager (singleton)
+job_manager = CeleryJobManager()

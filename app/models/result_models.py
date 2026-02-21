@@ -4,6 +4,13 @@ from urllib.parse import urlparse
 import os
 
 
+class JobStats(BaseModel):
+    queued: int
+    processing: int
+    completed: int
+    failed: int
+
+
 # --- Pydantic models for OpenAPI ---
 class HealthResponse(BaseModel):
     status: str
@@ -11,6 +18,8 @@ class HealthResponse(BaseModel):
     queue_size: int
     processing_jobs: int
     current_job: Optional[str]
+    redis_connected: bool = False
+    job_stats: Optional[JobStats] = None
 
 
 class ErrorResponse(BaseModel):

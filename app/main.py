@@ -1,7 +1,6 @@
 """Main FastAPI application"""
 import os
 import logging
-import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -13,7 +12,7 @@ from datetime import datetime
 
 from app.api.routes import router
 from app.core.dependencies import job_manager
-from app.core.background import process_rq_jobs, shutdown_process_pool
+from app.core.background import shutdown_process_pool
 from app.core.utils import get_version
 
 # Set up logging
@@ -26,7 +25,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup
     api_key = os.getenv("API_KEY")
-    logger.info("Starting up FastAPI web service with RQ... API key configured: %s", "Yes" if api_key else "No")
+    logger.info("Starting up FastAPI web service with Celery... API key configured: %s", "Yes" if api_key else "No")
 
     # Create output directory
     os.makedirs("outputs", exist_ok=True)
@@ -41,9 +40,6 @@ async def lifespan(app: FastAPI):
 
     # Clean up stale jobs
     job_manager.cleanup_stale_jobs()
-
-    # Start background job processor
-    asyncio.create_task(process_rq_jobs())
 
     yield
 
