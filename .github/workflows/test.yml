@@ -11,6 +11,7 @@ on:
       - main
     paths:
       - '**.py'
+      - 'Dockerfile'
       - 'pyproject.toml'
       - '.github/workflows/test.yml'
   workflow_dispatch:
@@ -19,76 +20,93 @@ jobs:
   api-tests:
     runs-on: ubuntu-latest
 
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
-
     env:
-      REDIS_URL: redis://localhost:6379
       API_KEY: test-key-for-ci
-      CELERY_QUEUE_NAME: celluloid_video_processing
-      CELERY_TASK_TIMEOUT: "300"
       BASE_URL: http://localhost:8081
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
         with:
-          python-version: "3.12"
-          cache: pip
+          context: .
+          load: true
+          tags: vision:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Install system dependencies for OpenCV / MediaPipe
+      - name: Create Docker network
+        run: docker network create vision-net
+
+      - name: Start Redis container
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            libglib2.0-0 libsm6 libxext6 libxrender1 libgomp1
+          docker run -d --name redis \
+            --network vision-net \
+            redis:7-alpine
 
-      - name: Install Python dependencies
+      - name: Wait for Redis to be ready
         run: |
-          pip install --upgrade pip
-          pip install -e ".[dev]"
+          timeout 30 bash -c \
+            'until docker exec redis redis-cli ping | grep -q PONG; do sleep 1; done'
+          echo "Redis is ready"
 
-      - name: Create outputs directory
-        run: mkdir -p outputs
-
-      - name: Start FastAPI application
+      - name: Start FastAPI application container
         run: |
-          uvicorn app.main:app --host 0.0.0.0 --port 8081 &
-          echo "APP_PID=$!" >> $GITHUB_ENV
+          docker run -d --name vision-api \
+            --network vision-net \
+            -p 8081:8081 \
+            -e REDIS_URL=redis://redis:6379 \
+            -e API_KEY=${{ env.API_KEY }} \
+            -e CELERY_QUEUE_NAME=celluloid_video_processing \
+            -e CELERY_TASK_TIMEOUT=300 \
+            vision:test
 
-      - name: Start Celery worker
+      - name: Start Celery worker container
         run: |
-          celery -A app.core.celery_app worker \
-            --loglevel=info \
-            --queues=celluloid_video_processing \
-            --concurrency=1 &
-          echo "WORKER_PID=$!" >> $GITHUB_ENV
+          docker run -d --name vision-worker \
+            --network vision-net \
+            -e REDIS_URL=redis://redis:6379 \
+            -e API_KEY=${{ env.API_KEY }} \
+            -e CELERY_QUEUE_NAME=celluloid_video_processing \
+            -e CELERY_TASK_TIMEOUT=300 \
+            vision:test \
+            celery -A app.core.celery_app worker \
+              --loglevel=info \
+              --queues=celluloid_video_processing \
+              --concurrency=1
 
       - name: Wait for API to be ready
         run: |
           echo "Waiting for FastAPI to start..."
-          timeout 60 bash -c \
+          timeout 120 bash -c \
             'until curl -sf http://localhost:8081/health; do sleep 2; done'
           echo ""
           echo "API is ready"
 
-      - name: Run API tests
-        run: |
-          pytest app/tests/test_api.py -v --tb=short
+      - name: Install test dependencies
+        run: pip install pytest requests
 
-      - name: Show application logs on failure
+      - name: Run API tests
+        run: pytest app/tests/test_api.py -v --tb=short
+
+      - name: Show container logs on failure
         if: failure()
         run: |
-          echo "=== FastAPI logs (last 100 lines) ==="
-          # uvicorn logs go to stdout/stderr; captured by GitHub Actions natively
-          echo "Check the 'Start FastAPI application' step output above."
+          echo "=== vision-api logs ==="
+          docker logs vision-api || true
+          echo "=== vision-worker logs ==="
+          docker logs vision-worker || true
+          echo "=== redis logs ==="
+          docker logs redis || true
+
+      - name: Cleanup containers and network
+        if: always()
+        run: |
+          docker stop vision-api vision-worker redis || true
+          docker rm vision-api vision-worker redis || true
+          docker network rm vision-net || true
