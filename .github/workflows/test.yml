@@ -1,0 +1,101 @@
+---
+name: API Tests
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '**.py'
+      - 'pyproject.toml'
+      - '.github/workflows/test.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - '**.py'
+      - 'pyproject.toml'
+      - '.github/workflows/test.yml'
+  workflow_dispatch:
+
+jobs:
+  api-tests:
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      REDIS_URL: redis://localhost:6379
+      API_KEY: test-key-for-ci
+      CELERY_QUEUE_NAME: celluloid_video_processing
+      CELERY_TASK_TIMEOUT: "300"
+      BASE_URL: http://localhost:8081
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install system dependencies for OpenCV / MediaPipe
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libglib2.0-0 libsm6 libxext6 libxrender1 libgomp1
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Create outputs directory
+        run: mkdir -p outputs
+
+      - name: Start FastAPI application
+        run: |
+          uvicorn app.main:app --host 0.0.0.0 --port 8081 &
+          echo "APP_PID=$!" >> $GITHUB_ENV
+
+      - name: Start Celery worker
+        run: |
+          celery -A app.core.celery_app worker \
+            --loglevel=info \
+            --queues=celluloid_video_processing \
+            --concurrency=1 &
+          echo "WORKER_PID=$!" >> $GITHUB_ENV
+
+      - name: Wait for API to be ready
+        run: |
+          echo "Waiting for FastAPI to start..."
+          timeout 60 bash -c \
+            'until curl -sf http://localhost:8081/health; do sleep 2; done'
+          echo ""
+          echo "API is ready"
+
+      - name: Run API tests
+        run: |
+          pytest app/tests/test_api.py -v --tb=short
+
+      - name: Show application logs on failure
+        if: failure()
+        run: |
+          echo "=== FastAPI logs (last 100 lines) ==="
+          # uvicorn logs go to stdout/stderr; captured by GitHub Actions natively
+          echo "Check the 'Start FastAPI application' step output above."

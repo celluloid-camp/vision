@@ -28,7 +28,15 @@ dependencies = [
 dev = [
     "black>=24.0.0",
     "flake8>=7.0.0",
+    "pytest>=8.0.0",
+    "requests>=2.31.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["app/tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
 
 [tool.setuptools]
 py-modules = [
