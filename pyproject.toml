@@ -18,7 +18,7 @@ dependencies = [
     "aiohttp>=3.9.1",
     "aiofiles==23.2.1",
     "scalar-fastapi==1.6.2",
-    "rq>=1.15.1",
+    "celery[redis]>=5.3.0",
     "redis>=5.0.1",
     "uvicorn>=0.34.3",
     "scenedetect==0.6.6",

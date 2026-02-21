@@ -41,8 +41,8 @@ async def health_check():
         # Get queue status
         queue_status = job_manager.get_queue_status_info()
 
-        # Count jobs by status using RQ
-        all_jobs = job_manager.get_all_jobs_from_rq()
+        # Count jobs by status
+        all_jobs = job_manager.get_all_jobs()
         queued_jobs = len([j for j in all_jobs if j.status == "queued"])
         processing_jobs = len([j for j in all_jobs if j.status == "processing"])
         completed_jobs = len([j for j in all_jobs if j.status == "completed"])
@@ -53,9 +53,7 @@ async def health_check():
             "timestamp": datetime.now().isoformat(),
             "queue_size": queue_status["queue_length"],
             "processing_jobs": processing_jobs,
-            "current_job": (
-                queue_status["current_job"].id if queue_status["current_job"] else None
-            ),
+            "current_job": queue_status["current_job"],
             "redis_connected": True,
             "job_stats": {
                 "queued": queued_jobs,
@@ -96,8 +94,8 @@ async def start_detection(
 
     try:
         # Check if there's already a job for this project_id
-        all_jobs = job_manager.get_all_jobs_from_rq()
-        logger.info(f"Found {len(all_jobs)} total jobs in RQ")
+        all_jobs = job_manager.get_all_jobs()
+        logger.info(f"Found {len(all_jobs)} total jobs in Celery")
 
         existing_jobs = [job for job in all_jobs if job.project_id == body.project_id]
         logger.info(f"Found {len(existing_jobs)} jobs for project {body.project_id}")
@@ -118,7 +116,6 @@ async def start_detection(
                 "queue_position": 1,
                 "message": f"Project {body.project_id} already has an active job",
                 "callback_url": existing_job.callback_url,
-                "rq_job_id": existing_job.job_id,
             }
 
         # Check for recently completed jobs (within last hour)
@@ -140,7 +137,6 @@ async def start_detection(
                 "queue_position": 0,
                 "message": f"Project {body.project_id} was recently completed",
                 "callback_url": existing_job.callback_url,
-                "rq_job_id": existing_job.job_id,
             }
 
         # Generate unique job ID
@@ -157,8 +153,8 @@ async def start_detection(
         job.status = "queued"
         job.start_time = datetime.now()
 
-        # Add job to RQ queue using the job manager
-        rq_job = job_manager.enqueue_job(job)
+        # Add job to Celery queue using the job manager
+        celery_result = job_manager.enqueue_job(job)  # noqa: F841
 
         logger.info(f"Started detection job {job_id} for project {body.project_id}")
         if body.callback_url:
@@ -167,10 +163,9 @@ async def start_detection(
         return {
             "job_id": job_id,
             "status": "queued",
-            "queue_position": 1,  # RQ doesn't provide position, assume 1
+            "queue_position": 1,
             "message": "Video analysis job added to queue",
             "callback_url": body.callback_url,
-            "rq_job_id": rq_job.id,
         }
 
     except HTTPException:
@@ -189,8 +184,8 @@ async def start_detection(
 async def get_job_status(job_id: str):
     """Get the status of a detection job"""
     try:
-        # Get job metadata from RQ
-        job = job_manager.get_job_from_rq(job_id)
+        # Get job metadata from Celery
+        job = job_manager.get_job_from_celery(job_id)
         job_info = None
         if not job:
             # Try persistent index
@@ -249,8 +244,8 @@ async def get_job_status(job_id: str):
 )
 async def get_job_results(job_id: str):
     try:
-        # Get job metadata from RQ
-        job = job_manager.get_job_from_rq(job_id)
+        # Get job metadata from Celery
+        job = job_manager.get_job_from_celery(job_id)
         result_data = None
         if not job:
             # Try persistent index
@@ -295,7 +290,7 @@ async def list_jobs(
         raise HTTPException(status_code=401, detail="Invalid API key")
 
     try:
-        filtered_jobs = job_manager.get_all_jobs_from_rq()
+        filtered_jobs = job_manager.get_all_jobs()
 
         if project_id:
             filtered_jobs = [j for j in filtered_jobs if j.project_id == project_id]
@@ -357,15 +352,15 @@ async def get_queue_status(key: Annotated[str, Depends(header_scheme)]):
         # Get current job info
         current_job_info = None
         if queue_status["current_job"]:
-            current_job = queue_status["current_job"]
-            job_meta = job_manager.get_job_from_rq(current_job.id)
+            current_job_id = queue_status["current_job"]
+            job_meta = job_manager.get_job_from_celery(current_job_id)
 
             current_job_info = {
-                "job_id": current_job.id,
+                "job_id": current_job_id,
                 "project_id": job_meta.project_id if job_meta else "unknown",
                 "start_time": (
-                    current_job.started_at.isoformat()
-                    if current_job.started_at
+                    job_meta.start_time.isoformat()
+                    if job_meta and job_meta.start_time
                     else None
                 ),
             }
