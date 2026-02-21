@@ -13,13 +13,6 @@ on:
       - '**.py'
       - 'pyproject.toml'
       - '.github/workflows/test.yml'
-  push:
-    branches:
-      - main
-    paths:
-      - '**.py'
-      - 'pyproject.toml'
-      - '.github/workflows/test.yml'
   workflow_dispatch:
 
 jobs:
