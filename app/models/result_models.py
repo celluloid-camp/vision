@@ -17,13 +17,10 @@ class HealthResponse(BaseModel):
     timestamp: str
     queue_size: int
     processing_jobs: int
-    current_job: Optional[str]
+    current_job: Optional[str] = None
     redis_connected: bool = False
     job_stats: Optional[JobStats] = None
-
-
-class ErrorResponse(BaseModel):
-    error: str
+    error: Optional[str] = None
 
 
 class AnalysisRequest(BaseModel):
@@ -50,7 +47,7 @@ class AnalysisResponse(BaseModel):
     status: str
     queue_position: int
     message: str
-    callback_url: Optional[str]
+    callback_url: Optional[str] = None
 
 
 class JobStatusResponse(BaseModel):
@@ -60,13 +57,13 @@ class JobStatusResponse(BaseModel):
     similarity_threshold: float
     status: str
     progress: float
-    queue_position: Optional[int]
-    estimated_wait_time: Optional[str]
-    start_time: Optional[str]
-    end_time: Optional[str]
-    result_path: Optional[str]
-    metadata: Optional[dict]
-    error_message: Optional[str]
+    queue_position: Optional[int] = None
+    estimated_wait_time: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    result_path: Optional[str] = None
+    metadata: Optional[dict] = None
+    error_message: Optional[str] = None
 
 
 class JobInfo(BaseModel):
@@ -74,9 +71,9 @@ class JobInfo(BaseModel):
     project_id: str
     status: str
     progress: float
-    queue_position: Optional[int]
-    start_time: Optional[str]
-    end_time: Optional[str]
+    queue_position: Optional[int] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
 
 
 class JobsListResponse(BaseModel):
@@ -96,18 +93,15 @@ class QueuedJob(BaseModel):
 class CurrentJob(BaseModel):
     job_id: str
     project_id: str
-    start_time: Optional[str]
+    start_time: Optional[str] = None
 
 
 class QueueStatusResponse(BaseModel):
     queue_size: int
     processing_jobs: int
-    current_job: Optional[CurrentJob]
+    current_job: Optional[CurrentJob] = None
     queued_jobs: list[QueuedJob]
-
-
-class DeleteJobResponse(BaseModel):
-    message: str
+    failed_jobs: int = 0
 
 
 # Pydantic models for OpenAPI schema (matching TypedDict structure)
@@ -181,8 +175,3 @@ class DetectionResultsModel(BaseModel):
     version: str
     metadata: ResultsMetadataModel
     frames: list[DetectionFrameModel]
-
-
-# Pydantic models for path parameters
-class JobIdPath(BaseModel):
-    job_id: str = Field(..., description="job id")
