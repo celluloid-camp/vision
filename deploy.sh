@@ -21,12 +21,13 @@ docker run -d \
     --name celluloid-video-analysis-api \
     --restart unless-stopped \
     -p 8081:8081 \
+    -p 5555:5555 \
     -v "$(pwd)/outputs:/app/outputs" \
     -v "$(pwd)/models:/app/models:ro" \
     -e REDIS_URL="redis://host.docker.internal:6379/0" \
     -e API_KEY="xxx" \
     -e CELERY_QUEUE_NAME="celluloid_video_processing" \
-    -e CELERY_TASK_TIMEOUT="300" \
+    -e CELERY_TASK_TIMEOUT="3000" \
     celluloid-video-analysis-api
 
 # Wait for service to be ready
@@ -48,6 +49,7 @@ echo ""
 echo "🎉 Deployment complete!"
 echo "📡 API is available at: http://localhost:8081"
 echo "🔍 Health check at: http://localhost:8081/health"
+echo "🔍 Flower is available at: http://localhost:5555"
 echo ""
 echo "📋 Useful commands:"
 echo "   View logs:   docker logs -f celluloid-video-analysis-api"

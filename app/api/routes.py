@@ -30,7 +30,12 @@ router = APIRouter()
 header_scheme = APIKeyHeader(name="x-api-key")
 
 
-@router.get("/health", response_model=HealthResponse, tags=["health"])
+@router.get(
+    "/health",
+    response_model=HealthResponse,
+    tags=["health"],
+    operation_id="health_check",
+)
 async def health_check():
     """Health check endpoint"""
     try:
@@ -70,6 +75,7 @@ async def health_check():
     "/job/analyse",
     response_model=AnalysisResponse,
     status_code=202,
+    operation_id="create_analysis_job",
     summary="Create an analysis task for a video",
     tags=["analysis"],
 )
@@ -167,6 +173,7 @@ async def create_analysis_task(
 
 @router.get(
     "/status/{job_id}",
+    operation_id="get_job_status",
     response_model=JobStatusResponse,
     summary="Get the status of a detection job",
     tags=["status"],
@@ -211,6 +218,7 @@ async def get_job_status(job_id: str):
 
 @router.get(
     "/job/{job_id}/results",
+    operation_id="get_job_results",
     response_model=JobResultsResponse,
     summary="Get the results of a completed analysis job",
     tags=["results"],
