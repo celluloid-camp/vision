@@ -50,8 +50,6 @@ class AnalysisResponse(BaseModel):
 class JobStatusResponse(BaseModel):
     job_id: str
     external_id: str
-    video_url: str
-    similarity_threshold: float
     status: str
     progress: float
     queue_position: int = 0

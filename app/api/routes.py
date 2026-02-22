@@ -67,13 +67,13 @@ async def health_check():
 
 
 @router.post(
-    "/analyse",
+    "/job/analyse",
     response_model=AnalysisResponse,
     status_code=202,
-    summary="Analyse a video",
+    summary="Create an analysis task for a video",
     tags=["analysis"],
 )
-async def start_detection(
+async def create_analysis_task(
     body: AnalysisRequest, key: Annotated[str, Depends(header_scheme)]
 ):
     """Start video analysis on a video"""
@@ -191,8 +191,6 @@ async def get_job_status(job_id: str):
         return {
             "job_id": job.job_id,
             "external_id": job.external_id,
-            "video_url": job.video_url,
-            "similarity_threshold": job.similarity_threshold,
             "status": job.status,
             "progress": job.progress,
             "queue_position": queue_position,
@@ -212,9 +210,9 @@ async def get_job_status(job_id: str):
 
 
 @router.get(
-    "/results/{job_id}",
+    "/job/{job_id}/results",
     response_model=JobResultsResponse,
-    summary="Get the results of a completed detection job",
+    summary="Get the results of a completed analysis job",
     tags=["results"],
 )
 async def get_job_results(job_id: str):
