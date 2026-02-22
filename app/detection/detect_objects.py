@@ -249,9 +249,7 @@ class ObjectDetector:
                                 fragment_id = self.sprite_generator.add_thumbnail(
                                     object_region, obj_id, frame_idx
                                 )
-                                sprite_reference = (
-                                    f"sprite.jpg{fragment_id}"  # Just filename + fragment
-                                )
+                                sprite_reference = f"sprite.jpg{fragment_id}"  # Just filename + fragment
                                 self.object_sprite_refs[obj_id] = sprite_reference
 
                             # Add object to frame data
