@@ -3,6 +3,12 @@
 This changelog is auto generated using release-it.
 
 
+## [1.4.0](https://github.com/celluloid-camp/vision/compare/v1.3.0...v1.4.0) (2026-02-22)
+
+### Features
+
+* Enhance deployment script and API routes with new port and operation IDs for improved service management ([945ceea](https://github.com/celluloid-camp/vision/commit/945ceea69def81e4bbd24b799197d4d13f6bd4cf))
+
 ## [1.3.0](https://github.com/celluloid-camp/vision/compare/v1.2.2...v1.3.0) (2026-02-22)
 
 ### Features
