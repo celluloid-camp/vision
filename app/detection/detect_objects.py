@@ -543,7 +543,7 @@ class ObjectDetector:
                         )
 
                         # Extract the detected object region
-                        object_region = frame[y: y + h, x: x + w]
+                        object_region = frame[y : y + h, x : x + w]
                         if object_region.size > 0:  # Check if region is valid
                             # For person objects, check if they contain a face to improve accuracy
                             if class_name == "person":
