@@ -99,7 +99,7 @@ app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
 # Webhook model for documentation
 class JobCompletedWebhook(BaseModel):
     job_id: str
-    project_id: str
+    external_id: str
     status: str
     timestamp: datetime
 

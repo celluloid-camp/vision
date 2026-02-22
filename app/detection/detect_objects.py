@@ -352,7 +352,7 @@ class ObjectDetector:
         min_score: float = 0.8,
         output_path: str = "detections.json",
         similarity_threshold: float = 0.5,
-        project_id: str = None,
+        external_id: str = None,
     ):
         # Initialize MediaPipe Object Detection
         model_path = get_model_path("detector")
@@ -373,7 +373,7 @@ class ObjectDetector:
 
         self.tracker = ObjectTracker(similarity_threshold)
         self.output_path = output_path
-        self.project_id = project_id
+        self.external_id = external_id
         self.results = None
         self.start_time = None
         self.frame_count = 0

@@ -16,14 +16,14 @@ def process_video_in_process(
     video_url: str,
     output_path: str,
     similarity_threshold: float,
-    project_id: str,
+    external_id: str,
 ) -> DetectionResults:
     """Process video in a separate process (this function runs in the process pool)"""
     detector = ObjectDetector(
         min_score=0.8,
         output_path=output_path,
         similarity_threshold=similarity_threshold,
-        project_id=project_id,
+        external_id=external_id,
     )
     results = detector.process_video(video_path, video_url)
     return results
