@@ -304,12 +304,16 @@ class CeleryJobManager:
                 queued.sort(key=lambda j: j.start_time or datetime.min)
 
             for i, job in enumerate(queued):
+                wait_seconds = (i + 1) * ESTIMATED_MINUTES_PER_JOB * 60
+                h = wait_seconds // 3600
+                m = (wait_seconds % 3600) // 60
+                s = wait_seconds % 60
                 queued_jobs.append(
                     {
                         "job_id": job.job_id,
                         "project_id": job.project_id,
                         "queue_position": i + 1,
-                        "estimated_wait_time": f"~{(i + 1) * ESTIMATED_MINUTES_PER_JOB} minutes",
+                        "estimated_wait_time": f"{h:02d}:{m:02d}:{s:02d}",
                     }
                 )
         except Exception as e:

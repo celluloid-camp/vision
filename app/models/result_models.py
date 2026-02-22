@@ -57,8 +57,8 @@ class JobStatusResponse(BaseModel):
     similarity_threshold: float
     status: str
     progress: float
-    queue_position: Optional[int] = None
-    estimated_wait_time: Optional[str] = None
+    queue_position: int = 0
+    estimated_wait_time: str = "00:00:00"
     start_time: Optional[str] = None
     end_time: Optional[str] = None
     error_message: Optional[str] = None

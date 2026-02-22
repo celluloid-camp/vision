@@ -188,8 +188,8 @@ async def get_job_status(job_id: str):
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
 
-        queue_position = None
-        estimated_wait_time = None
+        queue_position = 0
+        estimated_wait_time = "00:00:00"
 
         if job.status == "queued":
             queued = job_manager.get_queued_jobs()
