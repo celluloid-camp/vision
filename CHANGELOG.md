@@ -3,6 +3,12 @@
 This changelog is auto generated using release-it.
 
 
+## [1.2.1](https://github.com/celluloid-camp/vision/compare/v1.2.0...v1.2.1) (2026-02-22)
+
+### Bug Fixes
+
+* **deps:** update dependency scenedetect to v0.6.7.1 ([b62a630](https://github.com/celluloid-camp/vision/commit/b62a6301aacb7874aad5845ce582224b9d1aeac6))
+
 ## [1.2.0](https://github.com/celluloid-camp/vision/compare/v1.1.5...v1.2.0) (2026-02-22)
 
 ### Features
