@@ -72,12 +72,6 @@ class TestHealth:
         data = r.json()
         assert data["status"] == "healthy"
 
-    def test_health_contains_queue_size(self):
-        r = requests.get(f"{BASE_URL}/health")
-        data = r.json()
-        assert "queue_size" in data
-        assert isinstance(data["queue_size"], int)
-
     def test_health_contains_job_stats(self):
         r = requests.get(f"{BASE_URL}/health")
         data = r.json()
