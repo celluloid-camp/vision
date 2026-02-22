@@ -61,8 +61,6 @@ class JobStatusResponse(BaseModel):
     estimated_wait_time: Optional[str] = None
     start_time: Optional[str] = None
     end_time: Optional[str] = None
-    result_path: Optional[str] = None
-    metadata: Optional[dict] = None
     error_message: Optional[str] = None
 
 
@@ -175,3 +173,9 @@ class DetectionResultsModel(BaseModel):
     version: str
     metadata: ResultsMetadataModel
     frames: list[DetectionFrameModel]
+
+
+class JobResultsResponse(BaseModel):
+    status: str
+    data: Optional[DetectionResultsModel] = None
+    error_message: Optional[str] = None

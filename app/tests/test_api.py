@@ -233,6 +233,9 @@ class TestJobStatus:
         assert "status" in data
         assert data["status"] in ("queued", "processing", "completed", "failed")
         assert "progress" in data
+        assert "queue_position" in data
+        assert "estimated_wait_time" in data
+        assert "metadata" not in data
 
     def test_status_duplicate_project_returns_existing_job(self):
         """Submitting the same project_id twice returns the same job_id."""
@@ -256,9 +259,33 @@ class TestJobStatus:
 
 
 class TestJobResults:
-    def test_results_nonexistent_job_returns_404(self):
+    def test_results_nonexistent_job_returns_not_found_status(self):
         r = requests.get(f"{BASE_URL}/results/{FAKE_JOB_ID}")
-        assert r.status_code == 404
+        assert r.status_code == 200
+        data = r.json()
+        assert data["status"] == "not-found"
+        assert data["data"] is None
+
+    def test_results_response_has_status_and_data_fields(self):
+        """A queued job returns status=queued with data=null."""
+        r = requests.post(
+            f"{BASE_URL}/analyse",
+            json={
+                "project_id": "ci-results-shape",
+                "video_url": "http://example.com/video.mp4",
+            },
+            headers=HEADERS_AUTH,
+        )
+        if r.status_code != 202:
+            pytest.skip("Could not enqueue job; skipping results shape test")
+
+        job_id = r.json()["job_id"]
+        rr = requests.get(f"{BASE_URL}/results/{job_id}")
+        assert rr.status_code == 200
+        data = rr.json()
+        assert "status" in data
+        assert "data" in data
+        assert data["status"] in ("queued", "processing", "completed", "failed", "not-found")
 
 
 # ---------------------------------------------------------------------------
