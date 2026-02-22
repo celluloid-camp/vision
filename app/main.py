@@ -14,7 +14,6 @@ from datetime import datetime
 
 from app.api.routes import router
 from app.core.dependencies import job_manager
-from app.core.background import shutdown_process_pool
 from app.core.utils import get_version
 
 # Set up logging
@@ -59,7 +58,6 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down FastAPI web service...")
-    shutdown_process_pool()
 
 
 tags_metadata = [
