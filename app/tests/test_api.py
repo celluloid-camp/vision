@@ -282,7 +282,7 @@ class TestJobResults:
             pytest.skip("Could not enqueue job; skipping results shape test")
 
         job_id = r.json()["job_id"]
-        rr = requests.get(f"{BASE_URL}/results/{job_id}")
+        rr = requests.get(f"{BASE_URL}/job/{job_id}/results")
         assert rr.status_code == 200
         data = rr.json()
         assert "status" in data
