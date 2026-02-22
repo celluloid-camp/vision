@@ -113,7 +113,7 @@ def test_start_detection():
     
     # Sample request data
     request_data = {
-        "project_id": "test_project_002",
+        "external_id": "test_project_002",
         "video_url": TEST_VIDEO_URL,
         "similarity_threshold": 0.6,
         "callback_url": CALLBACK_URL
@@ -193,7 +193,7 @@ def test_list_jobs():
             print(f"  - Queue size: {data.get('queue_size', 0)}")
             print(f"  - Processing jobs: {data.get('processing_jobs', 0)}")
             for job in data.get('jobs', []):
-                print(f"    - {job.get('job_id')}: {job.get('status')} ({job.get('project_id')})")
+                print(f"    - {job.get('job_id')}: {job.get('status')} ({job.get('external_id')})")
             return True
         else:
             print(f"✗ Failed to list jobs: {response.status_code}")
@@ -217,7 +217,7 @@ def test_queue_status():
             if data.get('current_job'):
                 print(f"  - Current job: {data.get('current_job', {}).get('job_id')}")
             for job in data.get('queued_jobs', []):
-                print(f"    - Position {job.get('queue_position')}: {job.get('job_id')} ({job.get('project_id')})")
+                print(f"    - Position {job.get('queue_position')}: {job.get('job_id')} ({job.get('external_id')})")
             return True
         else:
             print(f"✗ Failed to get queue status: {response.status_code}")

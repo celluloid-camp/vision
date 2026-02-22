@@ -80,13 +80,13 @@ class JobStatus:
     def __init__(
         self,
         job_id: str,
-        project_id: str,
+        external_id: str,
         video_url: str,
         similarity_threshold: float,
         callback_url: str = None,
     ):
         self.job_id = job_id
-        self.project_id = project_id
+        self.external_id = external_id
         self.video_url = video_url
         self.similarity_threshold = similarity_threshold
         self.callback_url = callback_url

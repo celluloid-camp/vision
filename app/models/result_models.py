@@ -24,7 +24,7 @@ class HealthResponse(BaseModel):
 
 
 class AnalysisRequest(BaseModel):
-    project_id: str = Field(..., description="Project identifier")
+    external_id: str = Field(..., description="Project identifier")
     video_url: str = Field(..., description="URL or path to video file")
     similarity_threshold: float = Field(
         0.5, ge=0, le=1, description="Similarity threshold for object tracking"
@@ -52,13 +52,13 @@ class AnalysisResponse(BaseModel):
 
 class JobStatusResponse(BaseModel):
     job_id: str
-    project_id: str
+    external_id: str
     video_url: str
     similarity_threshold: float
     status: str
     progress: float
-    queue_position: Optional[int] = None
-    estimated_wait_time: Optional[str] = None
+    queue_position: int = 0
+    estimated_wait_time: str = "00:00:00"
     start_time: Optional[str] = None
     end_time: Optional[str] = None
     error_message: Optional[str] = None
@@ -66,7 +66,7 @@ class JobStatusResponse(BaseModel):
 
 class JobInfo(BaseModel):
     job_id: str
-    project_id: str
+    external_id: str
     status: str
     progress: float
     queue_position: Optional[int] = None
@@ -83,14 +83,14 @@ class JobsListResponse(BaseModel):
 
 class QueuedJob(BaseModel):
     job_id: str
-    project_id: str
+    external_id: str
     queue_position: int
     estimated_wait_time: str
 
 
 class CurrentJob(BaseModel):
     job_id: str
-    project_id: str
+    external_id: str
     start_time: Optional[str] = None
 
 

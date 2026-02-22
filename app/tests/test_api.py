@@ -108,7 +108,7 @@ class TestDocs:
 
 class TestAnalyseAuth:
     _valid_payload = {
-        "project_id": "ci-test-project",
+        "external_id": "ci-test-project",
         "video_url": "http://localhost/fake-video.mp4",
         "similarity_threshold": 0.5,
     }
@@ -141,7 +141,7 @@ class TestAnalyseAuth:
 
 
 class TestAnalyseValidation:
-    def test_analyse_missing_project_id_returns_422(self):
+    def test_analyse_missing_external_id_returns_422(self):
         r = requests.post(
             f"{BASE_URL}/analyse",
             json={"video_url": "http://example.com/v.mp4"},
@@ -152,7 +152,7 @@ class TestAnalyseValidation:
     def test_analyse_missing_video_url_returns_422(self):
         r = requests.post(
             f"{BASE_URL}/analyse",
-            json={"project_id": "ci-proj"},
+            json={"external_id": "ci-proj"},
             headers=HEADERS_AUTH,
         )
         assert r.status_code == 422
@@ -161,7 +161,7 @@ class TestAnalyseValidation:
         r = requests.post(
             f"{BASE_URL}/analyse",
             json={
-                "project_id": "ci-proj",
+                "external_id": "ci-proj",
                 "video_url": "http://example.com/v.mp4",
                 "similarity_threshold": 5.0,  # out of range [0, 1]
             },
@@ -173,7 +173,7 @@ class TestAnalyseValidation:
         r = requests.post(
             f"{BASE_URL}/analyse",
             json={
-                "project_id": "ci-proj",
+                "external_id": "ci-proj",
                 "video_url": "not-a-url-and-not-a-file",
             },
             headers=HEADERS_AUTH,
@@ -185,7 +185,7 @@ class TestAnalyseValidation:
         r = requests.post(
             f"{BASE_URL}/analyse",
             json={
-                "project_id": "ci-shape-test",
+                "external_id": "ci-shape-test",
                 "video_url": "http://example.com/video.mp4",
             },
             headers=HEADERS_AUTH,
@@ -217,7 +217,7 @@ class TestJobStatus:
         r = requests.post(
             f"{BASE_URL}/analyse",
             json={
-                "project_id": "ci-status-test",
+                "external_id": "ci-status-test",
                 "video_url": "http://example.com/video.mp4",
             },
             headers=HEADERS_AUTH,
@@ -238,9 +238,9 @@ class TestJobStatus:
         assert "metadata" not in data
 
     def test_status_duplicate_project_returns_existing_job(self):
-        """Submitting the same project_id twice returns the same job_id."""
+        """Submitting the same external_id twice returns the same job_id."""
         payload = {
-            "project_id": "ci-dedup-test",
+            "external_id": "ci-dedup-test",
             "video_url": "http://example.com/video.mp4",
         }
         r1 = requests.post(f"{BASE_URL}/analyse", json=payload, headers=HEADERS_AUTH)
@@ -271,7 +271,7 @@ class TestJobResults:
         r = requests.post(
             f"{BASE_URL}/analyse",
             json={
-                "project_id": "ci-results-shape",
+                "external_id": "ci-results-shape",
                 "video_url": "http://example.com/video.mp4",
             },
             headers=HEADERS_AUTH,

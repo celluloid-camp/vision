@@ -15,11 +15,11 @@ from app.detection.detect_objects import ObjectDetector, download_video
 logger = logging.getLogger(__name__)
 
 
-def _send_callback_sync(job_id, project_id, callback_url, status, results=None, error=None):
+def _send_callback_sync(job_id, external_id, callback_url, status, results=None, error=None):
     """Send callback notification synchronously with retry logic"""
     callback_data = {
         "job_id": job_id,
-        "project_id": project_id,
+        "external_id": external_id,
         "status": status,
         "timestamp": datetime.now().isoformat(),
     }
@@ -61,7 +61,7 @@ def _send_callback_sync(job_id, project_id, callback_url, status, results=None, 
 def process_video_task(self, job_data: dict):
     """Celery task for processing a video detection job"""
     job_id = job_data["job_id"]
-    project_id = job_data["project_id"]
+    external_id = job_data["external_id"]
     video_url = job_data["video_url"]
     similarity_threshold = float(job_data["similarity_threshold"])
     callback_url = job_data.get("callback_url")
@@ -71,7 +71,7 @@ def process_video_task(self, job_data: dict):
         state="PROCESSING",
         meta={
             "job_id": job_id,
-            "project_id": project_id,
+            "external_id": external_id,
             "video_url": video_url,
             "similarity_threshold": similarity_threshold,
             "callback_url": callback_url,
@@ -83,7 +83,7 @@ def process_video_task(self, job_data: dict):
 
     try:
         # Create output directory for this project
-        output_dir = os.path.join("outputs", project_id)
+        output_dir = os.path.join("outputs", external_id)
         os.makedirs(output_dir, exist_ok=True)
 
         # Generate output filename
@@ -111,7 +111,7 @@ def process_video_task(self, job_data: dict):
             min_score=0.8,
             output_path=output_path,
             similarity_threshold=similarity_threshold,
-            project_id=project_id,
+            external_id=external_id,
         )
 
         _last_reported = [0.0]
@@ -124,7 +124,7 @@ def process_video_task(self, job_data: dict):
                     state="PROCESSING",
                     meta={
                         "job_id": job_id,
-                        "project_id": project_id,
+                        "external_id": external_id,
                         "status": "processing",
                         "progress": round(pct, 1),
                         "start_time": start_time,
@@ -155,7 +155,7 @@ def process_video_task(self, job_data: dict):
 
         # Send completion callback
         if callback_url:
-            _send_callback_sync(job_id, project_id, callback_url, "completed", {"result_path": output_path, "metadata": metadata})
+            _send_callback_sync(job_id, external_id, callback_url, "completed", {"result_path": output_path, "metadata": metadata})
 
         # Clean up downloaded video
         if video_url.startswith(("http://", "https://")):
@@ -167,7 +167,7 @@ def process_video_task(self, job_data: dict):
 
         return {
             "job_id": job_id,
-            "project_id": project_id,
+            "external_id": external_id,
             "video_url": video_url,
             "similarity_threshold": similarity_threshold,
             "callback_url": callback_url,
@@ -185,6 +185,6 @@ def process_video_task(self, job_data: dict):
 
         # Send failure callback
         if callback_url:
-            _send_callback_sync(job_id, project_id, callback_url, "failed", error=error_msg)
+            _send_callback_sync(job_id, external_id, callback_url, "failed", error=error_msg)
 
         raise

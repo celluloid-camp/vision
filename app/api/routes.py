@@ -93,12 +93,12 @@ async def start_detection(
         raise HTTPException(status_code=401, detail=f"Invalid API key: {key}")
 
     try:
-        # Check if there's already a job for this project_id
+        # Check if there's already a job for this external_id
         all_jobs = job_manager.get_all_jobs()
         logger.info(f"Found {len(all_jobs)} total jobs in Celery")
 
-        existing_jobs = [job for job in all_jobs if job.project_id == body.project_id]
-        logger.info(f"Found {len(existing_jobs)} jobs for project {body.project_id}")
+        existing_jobs = [job for job in all_jobs if job.external_id == body.external_id]
+        logger.info(f"Found {len(existing_jobs)} jobs for project {body.external_id}")
 
         # Check for active jobs (queued or processing)
         active_jobs = [
@@ -108,13 +108,13 @@ async def start_detection(
             # Return the existing job info
             existing_job = active_jobs[0]
             logger.info(
-                f"Returning existing active job {existing_job.job_id} for project {body.project_id}"
+                f"Returning existing active job {existing_job.job_id} for project {body.external_id}"
             )
             return {
                 "job_id": existing_job.job_id,
                 "status": existing_job.status,
                 "queue_position": 1,
-                "message": f"Project {body.project_id} already has an active job",
+                "message": f"Project {body.external_id} already has an active job",
                 "callback_url": existing_job.callback_url,
             }
 
@@ -129,13 +129,13 @@ async def start_detection(
         if recent_completed:
             existing_job = recent_completed[0]
             logger.info(
-                f"Returning recently completed job {existing_job.job_id} for project {body.project_id}"
+                f"Returning recently completed job {existing_job.job_id} for project {body.external_id}"
             )
             return {
                 "job_id": existing_job.job_id,
                 "status": existing_job.status,
                 "queue_position": 0,
-                "message": f"Project {body.project_id} was recently completed",
+                "message": f"Project {body.external_id} was recently completed",
                 "callback_url": existing_job.callback_url,
             }
 
@@ -145,7 +145,7 @@ async def start_detection(
         # Create job status
         job = JobStatus(
             job_id,
-            body.project_id,
+            body.external_id,
             body.video_url,
             body.similarity_threshold,
             body.callback_url,
@@ -156,7 +156,7 @@ async def start_detection(
         # Add job to Celery queue using the job manager
         celery_result = job_manager.enqueue_job(job)  # noqa: F841
 
-        logger.info(f"Started detection job {job_id} for project {body.project_id}")
+        logger.info(f"Started detection job {job_id} for project {body.external_id}")
         if body.callback_url:
             logger.info(f"Callback URL configured: {body.callback_url}")
 
@@ -188,8 +188,8 @@ async def get_job_status(job_id: str):
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
 
-        queue_position = None
-        estimated_wait_time = None
+        queue_position = 0
+        estimated_wait_time = "00:00:00"
 
         if job.status == "queued":
             queued = job_manager.get_queued_jobs()
@@ -200,7 +200,7 @@ async def get_job_status(job_id: str):
 
         return {
             "job_id": job.job_id,
-            "project_id": job.project_id,
+            "external_id": job.external_id,
             "video_url": job.video_url,
             "similarity_threshold": job.similarity_threshold,
             "status": job.status,
@@ -260,7 +260,7 @@ async def get_job_results(job_id: str):
 @router.get("/jobs", response_model=JobsListResponse, include_in_schema=False)
 async def list_jobs(
     key: Annotated[str, Depends(header_scheme)],
-    project_id: Optional[str] = Query(None, description="Filter by project ID"),
+    external_id: Optional[str] = Query(None, description="Filter by project ID"),
     status: Optional[str] = Query(None, description="Filter by status"),
 ):
     """List all jobs with optional filtering"""
@@ -271,8 +271,8 @@ async def list_jobs(
     try:
         filtered_jobs = job_manager.get_all_jobs()
 
-        if project_id:
-            filtered_jobs = [j for j in filtered_jobs if j.project_id == project_id]
+        if external_id:
+            filtered_jobs = [j for j in filtered_jobs if j.external_id == external_id]
 
         if status:
             filtered_jobs = [j for j in filtered_jobs if j.status == status]
@@ -281,7 +281,7 @@ async def list_jobs(
         for job in filtered_jobs:
             job_info = {
                 "job_id": job.job_id,
-                "project_id": job.project_id,
+                "external_id": job.external_id,
                 "status": job.status,
                 "progress": job.progress,
                 "queue_position": getattr(job, "queue_position", None),
@@ -336,7 +336,7 @@ async def get_queue_status(key: Annotated[str, Depends(header_scheme)]):
 
             current_job_info = {
                 "job_id": current_job_id,
-                "project_id": job_meta.project_id if job_meta else "unknown",
+                "external_id": job_meta.external_id if job_meta else "unknown",
                 "start_time": (
                     job_meta.start_time.isoformat()
                     if job_meta and job_meta.start_time

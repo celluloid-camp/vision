@@ -42,7 +42,7 @@ class CeleryJobManager:
         """Persist job metadata in Redis"""
         data = {
             "job_id": job.job_id,
-            "project_id": job.project_id,
+            "external_id": job.external_id,
             "video_url": job.video_url,
             "similarity_threshold": float(job.similarity_threshold),
             "callback_url": job.callback_url,
@@ -73,7 +73,7 @@ class CeleryJobManager:
 
             job = JobStatus(
                 job_id=job_id,
-                project_id=meta.get("project_id", "unknown"),
+                external_id=meta.get("external_id", "unknown"),
                 video_url=meta.get("video_url", "unknown"),
                 similarity_threshold=float(meta.get("similarity_threshold", 0.0)),
                 callback_url=meta.get("callback_url"),
@@ -221,7 +221,7 @@ class CeleryJobManager:
 
             job_data = {
                 "job_id": job.job_id,
-                "project_id": job.project_id,
+                "external_id": job.external_id,
                 "video_url": job.video_url,
                 "similarity_threshold": job.similarity_threshold,
                 "callback_url": job.callback_url,
@@ -304,12 +304,16 @@ class CeleryJobManager:
                 queued.sort(key=lambda j: j.start_time or datetime.min)
 
             for i, job in enumerate(queued):
+                wait_seconds = (i + 1) * ESTIMATED_MINUTES_PER_JOB * 60
+                h = wait_seconds // 3600
+                m = (wait_seconds % 3600) // 60
+                s = wait_seconds % 60
                 queued_jobs.append(
                     {
                         "job_id": job.job_id,
-                        "project_id": job.project_id,
+                        "external_id": job.external_id,
                         "queue_position": i + 1,
-                        "estimated_wait_time": f"~{(i + 1) * ESTIMATED_MINUTES_PER_JOB} minutes",
+                        "estimated_wait_time": f"{h:02d}:{m:02d}:{s:02d}",
                     }
                 )
         except Exception as e:
