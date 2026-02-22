@@ -10,7 +10,6 @@ import cv2
 import requests
 
 from app.core.celery_app import celery_app
-from app.core.results_index import update_result_index
 from app.detection.detect_objects import ObjectDetector, download_video
 
 logger = logging.getLogger(__name__)
@@ -134,9 +133,6 @@ def process_video_task(self, job_data: dict):
 
         end_time = datetime.now().isoformat()
 
-        # Update persistent results index
-        update_result_index(job_id, output_path, "completed", metadata)
-
         logger.info(f"Job {job_id} completed successfully")
 
         # Send completion callback
@@ -168,9 +164,6 @@ def process_video_task(self, job_data: dict):
         error_msg = str(e)
         logger.error(f"Job {job_id} failed: {error_msg}")
         logger.error(traceback.format_exc())
-
-        # Update persistent results index with failed status
-        update_result_index(job_id, None, "failed", {"error_message": error_msg})
 
         # Send failure callback
         if callback_url:

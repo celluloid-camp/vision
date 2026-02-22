@@ -6,7 +6,6 @@ from app.core.background import (
     shutdown_process_pool,
 )
 from app.core.utils import get_version
-from app.core.results_index import update_result_index, get_result_from_index
 from app.core.celery_queue import CeleryJobManager
 
 __all__ = [
@@ -20,7 +19,5 @@ __all__ = [
     "process_video_in_process",
     "shutdown_process_pool",
     "get_version",
-    "update_result_index",
-    "get_result_from_index",
     "CeleryJobManager",
 ]

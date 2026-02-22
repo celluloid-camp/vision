@@ -89,7 +89,36 @@ class CeleryJobManager:
                 job.status = "processing"
             elif celery_state == "SUCCESS":
                 job.status = "completed"
-            elif celery_state in ("FAILURE", "REVOKED"):
+                # Pull result_path and metadata from the task return value and
+                # write them back into the Redis metadata so future calls do not
+                # need to re-query the Celery result backend.
+                task_result = result.result
+                if task_result and isinstance(task_result, dict):
+                    job.result_path = task_result.get("result_path")
+                    job.metadata = task_result.get("metadata", {})
+                    if task_result.get("end_time"):
+                        job.end_time = datetime.fromisoformat(task_result["end_time"])
+                    meta.update(
+                        {
+                            "status": "completed",
+                            "result_path": job.result_path,
+                            "metadata": job.metadata,
+                            "end_time": task_result.get("end_time"),
+                        }
+                    )
+                    self.redis_conn.setex(
+                        self._job_key(job_id), 86400, json.dumps(meta)
+                    )
+            elif celery_state == "FAILURE":
+                job.status = "failed"
+                exc = result.result
+                if exc and not meta.get("error_message"):
+                    job.error_message = str(exc)
+                    meta["error_message"] = job.error_message
+                    self.redis_conn.setex(
+                        self._job_key(job_id), 86400, json.dumps(meta)
+                    )
+            elif celery_state == "REVOKED":
                 job.status = "failed"
             else:
                 job.status = meta.get("status", "queued")

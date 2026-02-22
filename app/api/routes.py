@@ -1,5 +1,7 @@
 """API route handlers"""
+import json
 import logging
+import os
 import uuid
 from datetime import datetime
 from typing import Annotated, Optional
@@ -20,7 +22,6 @@ from app.models.result_models import (
     DetectionResultsModel,
 )
 from app.models.schemas import JobStatus
-from app.core.results_index import get_result_from_index
 
 logger = logging.getLogger(__name__)
 
@@ -186,30 +187,10 @@ async def get_job_status(job_id: str):
     try:
         # Get job metadata from Celery
         job = job_manager.get_job_from_celery(job_id)
-        job_info = None
         if not job:
-            # Try persistent index
-            job_info = get_result_from_index(job_id)
-            if not job_info:
-                raise HTTPException(status_code=404, detail="Job not found")
-            # Compose a minimal JobStatusResponse from index with valid types
-            return {
-                "job_id": job_id,
-                "project_id": "",
-                "video_url": "",
-                "similarity_threshold": 0.0,
-                "status": job_info.get("status", "unknown"),
-                "progress": 0.0,
-                "queue_position": None,
-                "estimated_wait_time": None,
-                "start_time": None,
-                "end_time": None,
-                "result_path": job_info.get("result_path"),
-                "metadata": job_info.get("metadata"),
-                "error_message": None,
-            }
+            raise HTTPException(status_code=404, detail="Job not found")
 
-        response = {
+        return {
             "job_id": job.job_id,
             "project_id": job.project_id,
             "video_url": job.video_url,
@@ -224,8 +205,6 @@ async def get_job_status(job_id: str):
             "metadata": job.metadata,
             "error_message": job.error_message,
         }
-
-        return response
 
     except HTTPException:
         raise
@@ -244,32 +223,30 @@ async def get_job_status(job_id: str):
 )
 async def get_job_results(job_id: str):
     try:
-        # Get job metadata from Celery
         job = job_manager.get_job_from_celery(job_id)
-        result_data = None
         if not job:
-            # Try persistent index
-            result_data = get_result_from_index(job_id)
-            if not result_data:
-                raise HTTPException(status_code=404, detail="Job not found")
-        else:
-            raise HTTPException(status_code=500, detail="Job queued")
-        if not result_data:
-            raise HTTPException(
-                status_code=404, detail="Result file not found or invalid"
-            )
-        if result_data.get("status") == "failed":
+            raise HTTPException(status_code=404, detail="Job not found")
+
+        if job.status == "failed":
             return JSONResponse(
                 status_code=400,
                 content={
                     "job_id": job_id,
                     "status": "failed",
-                    "error_message": result_data.get("metadata", {}).get(
-                        "error_message", "Unknown error"
-                    ),
+                    "error_message": job.error_message or "Unknown error",
                 },
             )
-        return result_data
+
+        if job.status != "completed":
+            raise HTTPException(
+                status_code=400, detail=f"Job is not completed (status: {job.status})"
+            )
+
+        if not job.result_path or not os.path.exists(job.result_path):
+            raise HTTPException(status_code=404, detail="Result file not found")
+
+        with open(job.result_path) as f:
+            return json.load(f)
 
     except HTTPException:
         raise
