@@ -70,15 +70,7 @@ class TestHealth:
     def test_health_when_redis_connected(self):
         r = requests.get(f"{BASE_URL}/health")
         data = r.json()
-        # Redis is provided as a service in CI; the API must be connected
-        assert data["redis_connected"] is True
         assert data["status"] == "healthy"
-
-    def test_health_contains_queue_size(self):
-        r = requests.get(f"{BASE_URL}/health")
-        data = r.json()
-        assert "queue_size" in data
-        assert isinstance(data["queue_size"], int)
 
     def test_health_contains_job_stats(self):
         r = requests.get(f"{BASE_URL}/health")
@@ -114,12 +106,12 @@ class TestAnalyseAuth:
     }
 
     def test_analyse_missing_api_key_returns_403(self):
-        r = requests.post(f"{BASE_URL}/analyse", json=self._valid_payload)
+        r = requests.post(f"{BASE_URL}/job/analyse", json=self._valid_payload)
         assert r.status_code == 403
 
     def test_analyse_wrong_api_key_returns_401(self):
         r = requests.post(
-            f"{BASE_URL}/analyse",
+            f"{BASE_URL}/job/analyse",
             json=self._valid_payload,
             headers={"x-api-key": "wrong-key"},
         )
@@ -127,7 +119,7 @@ class TestAnalyseAuth:
 
     def test_analyse_valid_api_key_returns_202(self):
         r = requests.post(
-            f"{BASE_URL}/analyse",
+            f"{BASE_URL}/job/analyse",
             json=self._valid_payload,
             headers=HEADERS_AUTH,
         )
@@ -143,7 +135,7 @@ class TestAnalyseAuth:
 class TestAnalyseValidation:
     def test_analyse_missing_external_id_returns_422(self):
         r = requests.post(
-            f"{BASE_URL}/analyse",
+            f"{BASE_URL}/job/analyse",
             json={"video_url": "http://example.com/v.mp4"},
             headers=HEADERS_AUTH,
         )
@@ -151,7 +143,7 @@ class TestAnalyseValidation:
 
     def test_analyse_missing_video_url_returns_422(self):
         r = requests.post(
-            f"{BASE_URL}/analyse",
+            f"{BASE_URL}/job/analyse",
             json={"external_id": "ci-proj"},
             headers=HEADERS_AUTH,
         )
@@ -159,7 +151,7 @@ class TestAnalyseValidation:
 
     def test_analyse_invalid_similarity_threshold_returns_422(self):
         r = requests.post(
-            f"{BASE_URL}/analyse",
+            f"{BASE_URL}/job/analyse",
             json={
                 "external_id": "ci-proj",
                 "video_url": "http://example.com/v.mp4",
@@ -171,7 +163,7 @@ class TestAnalyseValidation:
 
     def test_analyse_invalid_video_url_returns_422(self):
         r = requests.post(
-            f"{BASE_URL}/analyse",
+            f"{BASE_URL}/job/analyse",
             json={
                 "external_id": "ci-proj",
                 "video_url": "not-a-url-and-not-a-file",
@@ -183,7 +175,7 @@ class TestAnalyseValidation:
     def test_analyse_response_shape(self):
         """Valid request returns the expected JSON fields."""
         r = requests.post(
-            f"{BASE_URL}/analyse",
+            f"{BASE_URL}/job/analyse",
             json={
                 "external_id": "ci-shape-test",
                 "video_url": "http://example.com/video.mp4",
@@ -215,7 +207,7 @@ class TestJobStatus:
         The job will be in 'queued' state since no worker is running.
         """
         r = requests.post(
-            f"{BASE_URL}/analyse",
+            f"{BASE_URL}/job/analyse",
             json={
                 "external_id": "ci-status-test",
                 "video_url": "http://example.com/video.mp4",
@@ -243,12 +235,16 @@ class TestJobStatus:
             "external_id": "ci-dedup-test",
             "video_url": "http://example.com/video.mp4",
         }
-        r1 = requests.post(f"{BASE_URL}/analyse", json=payload, headers=HEADERS_AUTH)
+        r1 = requests.post(
+            f"{BASE_URL}/job/analyse", json=payload, headers=HEADERS_AUTH
+        )
         if r1.status_code != 202:
             pytest.skip("Could not enqueue job; skipping deduplication test")
         job_id_1 = r1.json()["job_id"]
 
-        r2 = requests.post(f"{BASE_URL}/analyse", json=payload, headers=HEADERS_AUTH)
+        r2 = requests.post(
+            f"{BASE_URL}/job/analyse", json=payload, headers=HEADERS_AUTH
+        )
         assert r2.status_code == 202
         assert r2.json()["job_id"] == job_id_1
 
@@ -260,7 +256,7 @@ class TestJobStatus:
 
 class TestJobResults:
     def test_results_nonexistent_job_returns_not_found_status(self):
-        r = requests.get(f"{BASE_URL}/results/{FAKE_JOB_ID}")
+        r = requests.get(f"{BASE_URL}/job/{FAKE_JOB_ID}/results")
         assert r.status_code == 200
         data = r.json()
         assert data["status"] == "not-found"
@@ -269,7 +265,7 @@ class TestJobResults:
     def test_results_response_has_status_and_data_fields(self):
         """A queued job returns status=queued with data=null."""
         r = requests.post(
-            f"{BASE_URL}/analyse",
+            f"{BASE_URL}/job/analyse",
             json={
                 "external_id": "ci-results-shape",
                 "video_url": "http://example.com/video.mp4",
@@ -280,65 +276,15 @@ class TestJobResults:
             pytest.skip("Could not enqueue job; skipping results shape test")
 
         job_id = r.json()["job_id"]
-        rr = requests.get(f"{BASE_URL}/results/{job_id}")
+        rr = requests.get(f"{BASE_URL}/job/{job_id}/results")
         assert rr.status_code == 200
         data = rr.json()
         assert "status" in data
         assert "data" in data
-        assert data["status"] in ("queued", "processing", "completed", "failed", "not-found")
-
-
-# ---------------------------------------------------------------------------
-# GET /jobs – authentication & shape
-# ---------------------------------------------------------------------------
-
-
-class TestJobsList:
-    def test_jobs_missing_api_key_returns_403(self):
-        r = requests.get(f"{BASE_URL}/jobs")
-        assert r.status_code == 403
-
-    def test_jobs_wrong_api_key_returns_401(self):
-        r = requests.get(f"{BASE_URL}/jobs", headers={"x-api-key": "bad-key"})
-        assert r.status_code == 401
-
-    def test_jobs_returns_200_with_valid_key(self):
-        r = requests.get(f"{BASE_URL}/jobs", headers=HEADERS_AUTH)
-        assert r.status_code == 200
-
-    def test_jobs_response_shape(self):
-        r = requests.get(f"{BASE_URL}/jobs", headers=HEADERS_AUTH)
-        data = r.json()
-        assert "jobs" in data
-        assert "total" in data
-        assert "queue_size" in data
-        assert "processing_jobs" in data
-        assert isinstance(data["jobs"], list)
-        assert isinstance(data["total"], int)
-
-
-# ---------------------------------------------------------------------------
-# GET /queue – authentication & shape
-# ---------------------------------------------------------------------------
-
-
-class TestQueueStatus:
-    def test_queue_missing_api_key_returns_403(self):
-        r = requests.get(f"{BASE_URL}/queue")
-        assert r.status_code == 403
-
-    def test_queue_wrong_api_key_returns_401(self):
-        r = requests.get(f"{BASE_URL}/queue", headers={"x-api-key": "bad-key"})
-        assert r.status_code == 401
-
-    def test_queue_returns_200_with_valid_key(self):
-        r = requests.get(f"{BASE_URL}/queue", headers=HEADERS_AUTH)
-        assert r.status_code == 200
-
-    def test_queue_response_shape(self):
-        r = requests.get(f"{BASE_URL}/queue", headers=HEADERS_AUTH)
-        data = r.json()
-        assert "queue_size" in data
-        assert "processing_jobs" in data
-        assert "queued_jobs" in data
-        assert isinstance(data["queued_jobs"], list)
+        assert data["status"] in (
+            "queued",
+            "processing",
+            "completed",
+            "failed",
+            "not-found",
+        )

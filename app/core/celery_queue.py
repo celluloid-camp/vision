@@ -1,4 +1,5 @@
 """Celery-based job manager (replaces RQ-based job manager)"""
+
 import json
 import logging
 import os
@@ -92,7 +93,9 @@ class CeleryJobManager:
                 # need to hit the Celery backend on every subsequent poll.
                 task_info = result.info
                 if task_info and isinstance(task_info, dict):
-                    live_progress = float(task_info.get("progress", meta.get("progress", 0.0)))
+                    live_progress = float(
+                        task_info.get("progress", meta.get("progress", 0.0))
+                    )
                     if live_progress != float(meta.get("progress", 0.0)):
                         meta["progress"] = live_progress
                         if task_info.get("start_time") and not meta.get("start_time"):
@@ -164,7 +167,11 @@ class CeleryJobManager:
         try:
             job_ids = self.redis_conn.smembers(JOB_REGISTRY_KEY)
             for job_id_bytes in job_ids:
-                job_id = job_id_bytes.decode("utf-8") if isinstance(job_id_bytes, bytes) else job_id_bytes
+                job_id = (
+                    job_id_bytes.decode("utf-8")
+                    if isinstance(job_id_bytes, bytes)
+                    else job_id_bytes
+                )
                 job = self.get_job_from_celery(job_id)
                 if job:
                     jobs.append(job)
@@ -178,7 +185,11 @@ class CeleryJobManager:
             logger.info("Cleaning up stale job references...")
             job_ids = self.redis_conn.smembers(JOB_REGISTRY_KEY)
             for job_id_bytes in job_ids:
-                job_id = job_id_bytes.decode("utf-8") if isinstance(job_id_bytes, bytes) else job_id_bytes
+                job_id = (
+                    job_id_bytes.decode("utf-8")
+                    if isinstance(job_id_bytes, bytes)
+                    else job_id_bytes
+                )
                 if not self._load_job_meta(job_id):
                     self.redis_conn.srem(JOB_REGISTRY_KEY, job_id)
                     logger.info(f"Removed stale job {job_id} from registry")
@@ -275,10 +286,9 @@ class CeleryJobManager:
                     try:
                         msg = json.loads(raw)
                         # Kombu message: {"headers": {"id": "<task_id>"}, ...}
-                        task_id = (
-                            msg.get("headers", {}).get("id")
-                            or msg.get("properties", {}).get("correlation_id")
-                        )
+                        task_id = msg.get("headers", {}).get("id") or msg.get(
+                            "properties", {}
+                        ).get("correlation_id")
                         if task_id:
                             broker_order.append(task_id)
                     except Exception:

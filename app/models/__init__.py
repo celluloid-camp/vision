@@ -1,4 +1,5 @@
 """Data models and schemas"""
+
 from app.models.schemas import (
     DetectionResults,
     JobStatus,
@@ -8,13 +9,8 @@ from app.models.result_models import (
     AnalysisRequest,
     AnalysisResponse,
     JobStatusResponse,
-    JobsListResponse,
-    QueueStatusResponse,
     DetectionResultsModel,
     JobResultsResponse,
-    JobInfo,
-    QueuedJob,
-    CurrentJob,
     JobStats,
 )
 
@@ -27,12 +23,7 @@ __all__ = [
     "AnalysisRequest",
     "AnalysisResponse",
     "JobStatusResponse",
-    "JobsListResponse",
-    "QueueStatusResponse",
     "DetectionResultsModel",
     "JobResultsResponse",
-    "JobInfo",
-    "QueuedJob",
-    "CurrentJob",
     "JobStats",
 ]

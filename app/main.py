@@ -14,10 +14,10 @@ from datetime import datetime
 
 from app.api.routes import router
 from app.core.dependencies import job_manager
-from app.core.utils import get_version
+from app.core.utils import get_version, get_log_level
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+# Set up logging (level from LOG_LEVEL env, default INFO)
+logging.basicConfig(level=get_log_level())
 logger = logging.getLogger(__name__)
 
 

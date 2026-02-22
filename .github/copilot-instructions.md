@@ -40,7 +40,7 @@ uv pip install -e .
 ### Running the Application
 ```bash
 # Using uv (recommended)
-uv run python run_app.py
+uv run python run.py api
 
 # The service starts on http://localhost:8081
 ```
@@ -70,7 +70,7 @@ The project uses a flat structure with all Python modules in the root directory:
 
 **Core Application Files:**
 - `app.py`: FastAPI application with API endpoints
-- `run_app.py`: Entry point script to start the application with Uvicorn
+- `run.py`: Unified entry point script for API, worker, and Flower
 - `detect_objects.py`: Core object detection logic using MediaPipe
 - `scenes.py`: Scene detection functionality using scenedetect
 - `rq_queue.py`: RQ job manager for async processing

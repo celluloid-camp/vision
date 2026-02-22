@@ -85,13 +85,31 @@ Run directly with uv. It will automatically use Python 3.12 as specified in
 `pyproject.toml`:
 
 ```bash
-uv run python run_app.py
+uv run python run.py api
 ```
 
 If you need to explicitly specify Python 3.12:
 
 ```bash
-uv run --python 3.12 python run_app.py
+uv run --python 3.12 python run.py api
 ```
 
 The service will start on `http://localhost:8081`
+
+### Celery Monitoring (Flower)
+
+Run Flower to monitor Celery workers, tasks, and queues:
+
+```bash
+uv run python run.py flower
+```
+
+Flower will be available at `http://localhost:5555` (or `FLOWER_PORT`).
+
+### Run API + Worker + Flower
+
+Run all three services in one process group:
+
+```bash
+uv run python run.py all
+```

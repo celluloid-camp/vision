@@ -2,365 +2,38 @@ import argparse
 import json
 import cv2
 import numpy as np
-from typing import Dict, Any, Tuple
 import time
+from typing import Dict
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import logging
-import requests
 import os
-import tempfile
-from urllib.parse import urlparse
 import sys
 from datetime import datetime
-import signal
-import atexit
-from PIL import Image
 
 # Import detection types
 from app.models.schemas import (
     DetectionResults,
 )
+from app.core.utils import (
+    get_log_level,
+    download_video,
+    get_version,
+)
+from app.detection.models import get_model_path
+from app.detection.sprite import SpriteGenerator
+from app.detection.tracker import ObjectTracker
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+# Set up logging (level from LOG_LEVEL env, default INFO)
+logging.basicConfig(level=get_log_level())
 logger = logging.getLogger(__name__)
-
-
-def ensure_dir(directory: str) -> None:
-    """Ensure directory exists, create if it doesn't"""
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-
-
-def download_file(url: str, local_path: str) -> str:
-    """
-    Download file from URL and return local path
-    """
-    logger.info(f"Downloading file from {url}")
-
-    # Download with progress tracking
-    response = requests.get(url, stream=True)
-    response.raise_for_status()
-
-    total_size = int(response.headers.get("content-length", 0))
-    block_size = 1024 * 1024  # 1MB chunks
-
-    with open(local_path, "wb") as f:
-        downloaded = 0
-        for data in response.iter_content(block_size):
-            downloaded += len(data)
-            f.write(data)
-            if total_size > 0:
-                done = int(50 * downloaded / total_size)
-                sys.stdout.write(
-                    f"\rDownloading: [{'=' * done}{' ' * (50-done)}] {downloaded}/{total_size} bytes"
-                )
-                sys.stdout.flush()
-
-    print()  # New line after progress bar
-    logger.info(f"Download complete: {local_path}")
-    return local_path
-
-
-def download_video(url: str) -> str:
-    """
-    Download video from URL and return local path
-    """
-    # Create a temporary file
-    temp_dir = tempfile.gettempdir()
-    filename = os.path.basename(urlparse(url).path)
-    if not filename:
-        filename = "video.mp4"
-    local_path = os.path.join(temp_dir, filename)
-
-    return download_file(url, local_path)
-
-
-def get_model_path(model_type: str = "detector") -> str:
-    """
-    Get the path to the model file, downloading it if necessary
-    """
-    if model_type == "detector":
-        model_url = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float32/latest/efficientdet_lite0.tflite"
-        model_name = "efficientdet_lite0.tflite"
-
-    # if model_type == "detector":
-    #     model_url = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite2/float32/latest/efficientdet_lite2.tflite"
-    #     model_name = "efficientdet_lite2.tflite"
-    # elif model_type == "embedder":
-    #     model_url = "https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_large/float32/latest/mobilenet_v3_large.tflite"
-    #     model_name = "mobilenet_v3_large.tflite"
-
-    elif model_type == "embedder":
-        model_url = "https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_small/float32/latest/mobilenet_v3_small.tflite"
-        model_name = "mobilenet_v3_small.tflite"
-
-    elif model_type == "face":
-        model_url = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite"
-        model_name = "detector.tflite"
-
-    model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
-    ensure_dir(model_dir)
-    model_path = os.path.join(model_dir, model_name)
-
-    if not os.path.exists(model_path):
-        logger.info(f"Model file not found, downloading {model_name}...")
-        download_file(model_url, model_path)
-
-    return model_path
-
-
-class ObjectTracker:
-    def __init__(
-        self, similarity_threshold: float = 0.5
-    ):  # Lowered threshold significantly
-        self.similarity_threshold = similarity_threshold
-        self.tracked_objects: Dict[str, Dict] = {}
-        self.class_counters = {}  # Separate counter for each class
-
-        # Initialize MediaPipe Image Embedder
-        model_path = get_model_path("embedder")
-        base_options = python.BaseOptions(model_asset_path=model_path)
-        options = vision.ImageEmbedderOptions(
-            base_options=base_options, l2_normalize=True, quantize=True
-        )
-        self.embedder = vision.ImageEmbedder.create_from_options(options)
-
-    def get_embedding(self, image: np.ndarray) -> Any:
-        """Get embedding for an image"""
-        # Convert to RGB if needed
-        if len(image.shape) == 2:
-            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-        elif image.shape[2] == 4:
-            image = cv2.cvtColor(image, cv2.COLOR_BGRA2RGB)
-        elif image.shape[2] == 3:
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-        # Create MediaPipe Image
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image)
-
-        # Get embedding
-        return self.embedder.embed(mp_image)
-
-    def find_similar_object(
-        self, embedding_result: Any, class_name: str, bbox: Any, frame_idx: int
-    ) -> Tuple[str, float]:
-        """Find the most similar tracked object of the same class"""
-        if not self.tracked_objects:
-            return None, 0.0
-
-        best_match_id = None
-        best_similarity = 0.0
-
-        for obj_id, obj in self.tracked_objects.items():
-            if obj["class"] != class_name:
-                continue
-
-            # Calculate embedding similarity only
-            embedding_similarity = vision.ImageEmbedder.cosine_similarity(
-                embedding_result.embeddings[0], obj["embedding"].embeddings[0]
-            )
-
-            logger.debug(f"Comparing with {obj_id}: emb={embedding_similarity:.3f}")
-
-            if embedding_similarity > best_similarity:
-                best_similarity = embedding_similarity
-                best_match_id = obj_id
-
-        if best_similarity >= self.similarity_threshold:
-            logger.debug(
-                f"Found similar object: {best_match_id} with similarity {best_similarity:.3f}"
-            )
-            return best_match_id, best_similarity
-
-        logger.debug(
-            f"No similar object found. Max similarity: {best_similarity:.3f} (threshold: {self.similarity_threshold})"
-        )
-        return None, best_similarity
-
-    def update(
-        self, frame_idx: int, detection: Any, embedding_result: Any, bbox: Any
-    ) -> str:
-        """Update tracked objects with new detection"""
-        class_name = detection.categories[0].category_name
-        confidence = detection.categories[0].score
-
-        # Find similar object of the same class
-        obj_id, similarity = self.find_similar_object(
-            embedding_result, class_name, bbox, frame_idx
-        )
-
-        if obj_id is None:
-            # New object of this class
-            if class_name not in self.class_counters:
-                self.class_counters[class_name] = 0
-            obj_id = f"{class_name}_{self.class_counters[class_name]}"
-            self.class_counters[class_name] += 1
-
-            self.tracked_objects[obj_id] = {
-                "class": class_name,
-                "embedding": embedding_result,
-                "first_detection": frame_idx,
-                "detections": [],
-            }
-        else:
-            logger.debug(
-                f"Updating existing {class_name}: {obj_id} (similarity: {similarity:.3f})"
-            )
-
-        # Update object data
-        detection_data = {
-            "frame_idx": frame_idx,
-            "confidence": float(confidence),
-            "similarity": float(similarity),
-            "bbox": {
-                "x": bbox.origin_x,
-                "y": bbox.origin_y,
-                "width": bbox.width,
-                "height": bbox.height,
-            },
-        }
-
-        self.tracked_objects[obj_id]["detections"].append(detection_data)
-
-        # Update the embedding to the latest one for better future matching
-        self.tracked_objects[obj_id]["embedding"] = embedding_result
-
-        return obj_id
-
-    def get_tracked_objects_for_json(self) -> Dict[str, Dict]:
-        """Get tracked objects without embeddings for JSON output"""
-        json_objects = {}
-        for obj_id, obj in self.tracked_objects.items():
-            json_objects[obj_id] = {
-                "class": obj["class"],
-                "first_detection": obj["first_detection"],
-                "detections": obj["detections"],
-            }
-        return json_objects
-
-
-class InterruptHandler:
-    def __init__(self, detector, enable_signals=True):
-        self.detector = detector
-        self.enable_signals = enable_signals
-
-        if enable_signals:
-            try:
-                # Only set up signal handling if we're in the main thread
-                import threading
-
-                if threading.current_thread() is threading.main_thread():
-                    self.original_sigint = signal.getsignal(signal.SIGINT)
-                    signal.signal(signal.SIGINT, self.handle_interrupt)
-                    atexit.register(self.cleanup)
-                else:
-                    logger.debug("Not in main thread, skipping signal handler setup")
-                    self.enable_signals = False
-            except Exception as e:
-                logger.warning(f"Could not set up signal handler: {e}")
-                self.enable_signals = False
-
-    def handle_interrupt(self, signum, frame):
-        print("\nInterrupted! Exiting gracefully...")
-        sys.exit(0)
-
-    def cleanup(self):
-        if self.enable_signals:
-            try:
-                signal.signal(signal.SIGINT, self.original_sigint)
-            except Exception as e:
-                logger.warning(f"Error restoring signal handler: {e}")
-
-
-class SpriteGenerator:
-    def __init__(self, thumbnail_size: Tuple[int, int] = (160, 90)):
-        self.thumbnail_size = thumbnail_size
-        self.current_x = 0
-        self.current_y = 0
-        self.max_width = 1920  # Maximum width for sprite
-        self.sprites = []
-        self.sprite_image = None
-        self.actual_height = 0  # Track actual height used
-
-    def add_thumbnail(self, image: np.ndarray, obj_id: str, frame_idx: int) -> str:
-        """Add a thumbnail to the sprite and return the fragment identifier"""
-        # Resize image to thumbnail size
-        thumbnail = cv2.resize(image, self.thumbnail_size)
-
-        # Convert BGR to RGB for PIL
-        thumbnail_rgb = cv2.cvtColor(thumbnail, cv2.COLOR_BGR2RGB)
-        pil_thumbnail = Image.fromarray(thumbnail_rgb)
-
-        # Check if we need to start a new row
-        if self.current_x + self.thumbnail_size[0] > self.max_width:
-            self.current_x = 0
-            self.current_y += self.thumbnail_size[1]
-
-        # Add thumbnail to sprite
-        if self.sprite_image is None:
-            # Create new sprite image with initial height
-            initial_height = self.thumbnail_size[1] * 10  # Start with 10 rows
-            self.sprite_image = Image.new(
-                "RGB", (self.max_width, initial_height), (255, 255, 255)
-            )
-            self.actual_height = initial_height
-
-        # Check if we need to expand the sprite height
-        required_height = self.current_y + self.thumbnail_size[1]
-        if required_height > self.actual_height:
-            # Create new larger sprite
-            new_height = max(self.actual_height * 2, required_height)
-            new_sprite = Image.new("RGB", (self.max_width, new_height), (255, 255, 255))
-            new_sprite.paste(self.sprite_image, (0, 0))
-            self.sprite_image = new_sprite
-            self.actual_height = new_height
-
-        # Paste thumbnail at current position
-        self.sprite_image.paste(pil_thumbnail, (self.current_x, self.current_y))
-
-        # Create fragment identifier
-        fragment_id = f"#xywh={self.current_x},{self.current_y},{self.thumbnail_size[0]},{self.thumbnail_size[1]}"
-
-        # Store sprite info
-        self.sprites.append(
-            {
-                "obj_id": obj_id,
-                "frame_idx": frame_idx,
-                "x": self.current_x,
-                "y": self.current_y,
-                "width": self.thumbnail_size[0],
-                "height": self.thumbnail_size[1],
-                "fragment_id": fragment_id,
-            }
-        )
-
-        # Update position for next thumbnail
-        self.current_x += self.thumbnail_size[0]
-
-        return fragment_id
-
-    def save_sprite(self, output_path: str) -> None:
-        """Save the sprite image as a JPEG file to output_path."""
-        if self.sprite_image is not None:
-            # Crop the sprite to the actual used area
-            actual_used_height = self.current_y + self.thumbnail_size[1]
-            if actual_used_height < self.actual_height:
-                self.sprite_image = self.sprite_image.crop(
-                    (0, 0, self.max_width, actual_used_height)
-                )
-            self.sprite_image.save(output_path, format="JPEG", quality=50)
-            logger.info(
-                f"Sprite saved to: {output_path} (dimensions: {self.sprite_image.size})"
-            )
 
 
 class ObjectDetector:
     def __init__(
         self,
-        min_score: float = 0.8,
+        min_score: float = 0.5,
         output_path: str = "detections.json",
         similarity_threshold: float = 0.5,
         external_id: str = None,
@@ -392,6 +65,7 @@ class ObjectDetector:
         self.frames_with_detections = 0
         self.last_timestamp = -1
         self.sprite_generator = None
+        self.object_sprite_refs: Dict[str, str] = {}
 
         # Statistics tracking
         self.detection_stats = {
@@ -440,6 +114,7 @@ class ObjectDetector:
         """
         self.start_time = time.time()
         self.last_timestamp = -1
+        self.object_sprite_refs = {}
 
         # Create temporary directory for sprite
         import tempfile
@@ -462,7 +137,7 @@ class ObjectDetector:
 
         # Initialize results dictionary in TAO format
         self.results = {
-            "version": "1.0",
+            "version": get_version(),
             "metadata": {
                 "video": {
                     "fps": fps,
@@ -471,11 +146,6 @@ class ObjectDetector:
                     "height": height,
                     "source": video_source_url if video_source_url else video_path,
                 },
-                "model": {
-                    "name": "efficientdet_lite0",
-                    "type": "object_detection",
-                    "version": "1.0",
-                },
                 "sprite": {
                     "path": "sprite.jpg",  # Just the filename, no path
                     "thumbnail_size": [160, 90],
@@ -483,12 +153,6 @@ class ObjectDetector:
             },
             "frames": [],
         }
-
-        # Set up interrupt handler
-        import threading
-
-        enable_signals = threading.current_thread() is threading.main_thread()
-        InterruptHandler(self, enable_signals=enable_signals)
 
         frame_idx = 0
         consecutive_failures = 0
@@ -577,13 +241,16 @@ class ObjectDetector:
                                 frame_idx, detection, embedding_result, bbox
                             )
 
-                            # Add thumbnail to sprite and get fragment identifier
-                            fragment_id = self.sprite_generator.add_thumbnail(
-                                object_region, obj_id, frame_idx
-                            )
-                            sprite_reference = (
-                                f"sprite.jpg{fragment_id}"  # Just filename + fragment
-                            )
+                            # Only create a sprite thumbnail for the first sighting
+                            # of an object; reuse it for all future detections.
+                            if obj_id in self.object_sprite_refs:
+                                sprite_reference = self.object_sprite_refs[obj_id]
+                            else:
+                                fragment_id = self.sprite_generator.add_thumbnail(
+                                    object_region, obj_id, frame_idx
+                                )
+                                sprite_reference = f"sprite.jpg{fragment_id}"  # Just filename + fragment
+                                self.object_sprite_refs[obj_id] = sprite_reference
 
                             # Add object to frame data
                             frame_data["objects"].append(
@@ -705,12 +372,16 @@ def main():
     )
     args = parser.parse_args()
 
+    video_path = None
+    downloaded_video = False
+
     try:
         logger.info(f"Starting video processing: {args.video_url}")
 
         # Download video if it's a URL
         if args.video_url.startswith(("http://", "https://")):
             video_path = download_video(args.video_url)
+            downloaded_video = True
         else:
             video_path = args.video_url
 
@@ -727,17 +398,19 @@ def main():
 
         logger.info(f"Detection completed. Results saved to {args.output}")
 
-        # Clean up downloaded video if it was downloaded
-        if args.video_url.startswith(("http://", "https://")):
+    except KeyboardInterrupt:
+        logger.info("Processing cancelled by user.")
+        return 130
+    except Exception as e:
+        logger.error(f"Error processing video: {str(e)}")
+        return 1
+    finally:
+        if downloaded_video and video_path:
             try:
                 os.remove(video_path)
                 logger.info(f"Cleaned up temporary video file: {video_path}")
             except Exception as e:
                 logger.warning(f"Failed to clean up temporary video file: {str(e)}")
-
-    except Exception as e:
-        logger.error(f"Error processing video: {str(e)}")
-        return 1
 
     return 0
 

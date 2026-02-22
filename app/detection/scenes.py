@@ -3,7 +3,7 @@ import json
 from typing import List, Optional
 from scenedetect import open_video, SceneManager
 from scenedetect.detectors import ContentDetector, ThresholdDetector
-from app.detection.detect_objects import download_file, ensure_dir
+from app.core.utils import download_file, ensure_dir
 from datetime import datetime
 from urllib.parse import urlparse
 from pydantic import BaseModel

@@ -1,4 +1,5 @@
 """Celery tasks for video processing"""
+
 import json
 import logging
 import os
@@ -10,12 +11,15 @@ import cv2
 import requests
 
 from app.core.celery_app import celery_app
-from app.detection.detect_objects import ObjectDetector, download_video
+from app.core.utils import download_video
+from app.detection.detect_objects import ObjectDetector
 
 logger = logging.getLogger(__name__)
 
 
-def _send_callback_sync(job_id, external_id, callback_url, status, results=None, error=None):
+def _send_callback_sync(
+    job_id, external_id, callback_url, status, results=None, error=None
+):
     """Send callback notification synchronously with retry logic"""
     callback_data = {
         "job_id": job_id,
@@ -40,13 +44,20 @@ def _send_callback_sync(job_id, external_id, callback_url, status, results=None,
                 timeout=30,
             )
             if 200 <= response.status_code < 300:
-                logger.info(f"Callback sent successfully to {callback_url} (attempt {attempt + 1})")
+                logger.info(
+                    f"Callback sent successfully to {callback_url} (attempt {attempt + 1})"
+                )
                 return
-            elif 400 <= response.status_code < 500 and response.status_code not in [408, 429]:
+            elif 400 <= response.status_code < 500 and response.status_code not in [
+                408,
+                429,
+            ]:
                 logger.error(f"Client error {response.status_code}, not retrying")
                 break
             else:
-                logger.warning(f"Callback attempt {attempt + 1} returned {response.status_code}")
+                logger.warning(
+                    f"Callback attempt {attempt + 1} returned {response.status_code}"
+                )
         except Exception as exc:
             logger.warning(f"Callback attempt {attempt + 1} failed: {exc}")
 
@@ -103,7 +114,9 @@ def process_video_task(self, job_data: dict):
             raise ValueError("Video file not valid")
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         if frame_count == 0:
-            raise ValueError(f"Video contains no video stream. It may be audio-only: {video_path}")
+            raise ValueError(
+                f"Video contains no video stream. It may be audio-only: {video_path}"
+            )
         cap.release()
 
         # Process the video
@@ -131,7 +144,9 @@ def process_video_task(self, job_data: dict):
                     },
                 )
 
-        results = detector.process_video(video_path, video_url, progress_callback=_report_progress)
+        results = detector.process_video(
+            video_path, video_url, progress_callback=_report_progress
+        )
 
         # Save results to disk
         with open(output_path, "w") as f:
@@ -155,7 +170,13 @@ def process_video_task(self, job_data: dict):
 
         # Send completion callback
         if callback_url:
-            _send_callback_sync(job_id, external_id, callback_url, "completed", {"result_path": output_path, "metadata": metadata})
+            _send_callback_sync(
+                job_id,
+                external_id,
+                callback_url,
+                "completed",
+                {"result_path": output_path, "metadata": metadata},
+            )
 
         # Clean up downloaded video
         if video_url.startswith(("http://", "https://")):
@@ -185,6 +206,8 @@ def process_video_task(self, job_data: dict):
 
         # Send failure callback
         if callback_url:
-            _send_callback_sync(job_id, external_id, callback_url, "failed", error=error_msg)
+            _send_callback_sync(
+                job_id, external_id, callback_url, "failed", error=error_msg
+            )
 
         raise
