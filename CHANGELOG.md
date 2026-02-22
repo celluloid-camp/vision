@@ -3,6 +3,12 @@
 This changelog is auto generated using release-it.
 
 
+## [1.4.1](https://github.com/celluloid-camp/vision/compare/v1.4.0...v1.4.1) (2026-02-22)
+
+### Chores
+
+* Update operation IDs in openapi.json for clarity and consistency ([8fa0018](https://github.com/celluloid-camp/vision/commit/8fa00181b7fbc274e9d9b4777b83d53a3521d57f))
+
 ## [1.4.0](https://github.com/celluloid-camp/vision/compare/v1.3.0...v1.4.0) (2026-02-22)
 
 ### Features
