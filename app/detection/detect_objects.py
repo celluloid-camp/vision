@@ -11,8 +11,6 @@ import logging
 import os
 import sys
 from datetime import datetime
-import signal
-import atexit
 from PIL import Image
 
 # Import detection types
@@ -198,39 +196,6 @@ class ObjectTracker:
                 "detections": obj["detections"],
             }
         return json_objects
-
-
-class InterruptHandler:
-    def __init__(self, detector, enable_signals=True):
-        self.detector = detector
-        self.enable_signals = enable_signals
-
-        if enable_signals:
-            try:
-                # Only set up signal handling if we're in the main thread
-                import threading
-
-                if threading.current_thread() is threading.main_thread():
-                    self.original_sigint = signal.getsignal(signal.SIGINT)
-                    signal.signal(signal.SIGINT, self.handle_interrupt)
-                    atexit.register(self.cleanup)
-                else:
-                    logger.debug("Not in main thread, skipping signal handler setup")
-                    self.enable_signals = False
-            except Exception as e:
-                logger.warning(f"Could not set up signal handler: {e}")
-                self.enable_signals = False
-
-    def handle_interrupt(self, signum, frame):
-        print("\nInterrupted! Exiting gracefully...")
-        sys.exit(0)
-
-    def cleanup(self):
-        if self.enable_signals:
-            try:
-                signal.signal(signal.SIGINT, self.original_sigint)
-            except Exception as e:
-                logger.warning(f"Error restoring signal handler: {e}")
 
 
 class SpriteGenerator:
@@ -436,12 +401,6 @@ class ObjectDetector:
             },
             "frames": [],
         }
-
-        # Set up interrupt handler
-        import threading
-
-        enable_signals = threading.current_thread() is threading.main_thread()
-        InterruptHandler(self, enable_signals=enable_signals)
 
         frame_idx = 0
         consecutive_failures = 0
@@ -658,12 +617,16 @@ def main():
     )
     args = parser.parse_args()
 
+    video_path = None
+    downloaded_video = False
+
     try:
         logger.info(f"Starting video processing: {args.video_url}")
 
         # Download video if it's a URL
         if args.video_url.startswith(("http://", "https://")):
             video_path = download_video(args.video_url)
+            downloaded_video = True
         else:
             video_path = args.video_url
 
@@ -680,17 +643,19 @@ def main():
 
         logger.info(f"Detection completed. Results saved to {args.output}")
 
-        # Clean up downloaded video if it was downloaded
-        if args.video_url.startswith(("http://", "https://")):
+    except KeyboardInterrupt:
+        logger.info("Processing cancelled by user.")
+        return 130
+    except Exception as e:
+        logger.error(f"Error processing video: {str(e)}")
+        return 1
+    finally:
+        if downloaded_video and video_path:
             try:
                 os.remove(video_path)
                 logger.info(f"Cleaned up temporary video file: {video_path}")
             except Exception as e:
                 logger.warning(f"Failed to clean up temporary video file: {str(e)}")
-
-    except Exception as e:
-        logger.error(f"Error processing video: {str(e)}")
-        return 1
 
     return 0
 
