@@ -13,12 +13,9 @@ class JobStats(BaseModel):
 
 # --- Pydantic models for OpenAPI ---
 class HealthResponse(BaseModel):
+    version: str
     status: str
     timestamp: str
-    queue_size: int
-    processing_jobs: int
-    current_job: Optional[str] = None
-    redis_connected: bool = False
     job_stats: Optional[JobStats] = None
     error: Optional[str] = None
 
@@ -64,44 +61,6 @@ class JobStatusResponse(BaseModel):
     error_message: Optional[str] = None
 
 
-class JobInfo(BaseModel):
-    job_id: str
-    external_id: str
-    status: str
-    progress: float
-    queue_position: Optional[int] = None
-    start_time: Optional[str] = None
-    end_time: Optional[str] = None
-
-
-class JobsListResponse(BaseModel):
-    jobs: list[JobInfo]
-    total: int
-    queue_size: int
-    processing_jobs: int
-
-
-class QueuedJob(BaseModel):
-    job_id: str
-    external_id: str
-    queue_position: int
-    estimated_wait_time: str
-
-
-class CurrentJob(BaseModel):
-    job_id: str
-    external_id: str
-    start_time: Optional[str] = None
-
-
-class QueueStatusResponse(BaseModel):
-    queue_size: int
-    processing_jobs: int
-    current_job: Optional[CurrentJob] = None
-    queued_jobs: list[QueuedJob]
-    failed_jobs: int = 0
-
-
 # Pydantic models for OpenAPI schema (matching TypedDict structure)
 class BoundingBoxModel(BaseModel):
     x: int
@@ -132,12 +91,6 @@ class VideoMetadataModel(BaseModel):
     source: str
 
 
-class ModelMetadataModel(BaseModel):
-    name: str
-    type: str
-    version: str
-
-
 class SpriteMetadataModel(BaseModel):
     path: str
     thumbnail_size: list[int]
@@ -164,7 +117,6 @@ class ProcessingMetadataModel(BaseModel):
 
 class ResultsMetadataModel(BaseModel):
     video: VideoMetadataModel
-    model: ModelMetadataModel
     sprite: SpriteMetadataModel
     processing: ProcessingMetadataModel
 

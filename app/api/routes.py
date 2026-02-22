@@ -1,14 +1,15 @@
 """API route handlers"""
+
 import json
 import logging
 import os
 import uuid
 from datetime import datetime
-from typing import Annotated, Optional
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import APIKeyHeader
-
+from app.core.utils import get_version
 from app.core.config import API_KEY
 from app.core.dependencies import job_manager
 from app.models.result_models import (
@@ -16,8 +17,6 @@ from app.models.result_models import (
     AnalysisRequest,
     AnalysisResponse,
     JobStatusResponse,
-    JobsListResponse,
-    QueueStatusResponse,
     JobResultsResponse,
 )
 from app.models.schemas import JobStatus
@@ -38,9 +37,6 @@ async def health_check():
         # Test Redis connection
         job_manager.redis_conn.ping()
 
-        # Get queue status
-        queue_status = job_manager.get_queue_status_info()
-
         # Count jobs by status
         all_jobs = job_manager.get_all_jobs()
         queued_jobs = len([j for j in all_jobs if j.status == "queued"])
@@ -49,12 +45,9 @@ async def health_check():
         failed_jobs = len([j for j in all_jobs if j.status == "failed"])
 
         return {
+            "version": get_version(),
             "status": "healthy",
             "timestamp": datetime.now().isoformat(),
-            "queue_size": queue_status["queue_length"],
-            "processing_jobs": processing_jobs,
-            "current_job": queue_status["current_job"],
-            "redis_connected": True,
             "job_stats": {
                 "queued": queued_jobs,
                 "processing": processing_jobs,
@@ -65,13 +58,10 @@ async def health_check():
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
         return {
+            "version": get_version(),
             "status": "unhealthy",
             "timestamp": datetime.now().isoformat(),
             "error": "Health check failed",
-            "redis_connected": False,
-            "queue_size": 0,
-            "processing_jobs": 0,
-            "current_job": None,
             "job_stats": {"queued": 0, "processing": 0, "completed": 0, "failed": 0},
         }
 
@@ -255,105 +245,3 @@ async def get_job_results(job_id: str):
     except Exception as e:
         logger.error(f"Error reading results for job {job_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error reading results: {str(e)}")
-
-
-@router.get("/jobs", response_model=JobsListResponse, include_in_schema=False)
-async def list_jobs(
-    key: Annotated[str, Depends(header_scheme)],
-    external_id: Optional[str] = Query(None, description="Filter by project ID"),
-    status: Optional[str] = Query(None, description="Filter by status"),
-):
-    """List all jobs with optional filtering"""
-
-    if key != API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid API key")
-
-    try:
-        filtered_jobs = job_manager.get_all_jobs()
-
-        if external_id:
-            filtered_jobs = [j for j in filtered_jobs if j.external_id == external_id]
-
-        if status:
-            filtered_jobs = [j for j in filtered_jobs if j.status == status]
-
-        job_list = []
-        for job in filtered_jobs:
-            job_info = {
-                "job_id": job.job_id,
-                "external_id": job.external_id,
-                "status": job.status,
-                "progress": job.progress,
-                "queue_position": getattr(job, "queue_position", None),
-                "start_time": (
-                    job.start_time.isoformat()
-                    if getattr(job, "start_time", None)
-                    else None
-                ),
-                "end_time": (
-                    job.end_time.isoformat() if getattr(job, "end_time", None) else None
-                ),
-            }
-            job_list.append(job_info)
-
-        # Sort by start time
-        job_list.sort(key=lambda x: x.get("start_time", ""))
-
-        # Get queue status
-        queue_status = job_manager.get_queue_status_info()
-
-        return {
-            "jobs": job_list,
-            "total": len(job_list),
-            "queue_size": queue_status["queue_length"],
-            "processing_jobs": len(
-                [j for j in filtered_jobs if j.status == "processing"]
-            ),
-        }
-
-    except Exception as e:
-        logger.error(f"Error listing jobs: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error listing jobs: {str(e)}")
-
-
-@router.get("/queue", response_model=QueueStatusResponse, include_in_schema=False)
-async def get_queue_status(key: Annotated[str, Depends(header_scheme)]):
-    """Get detailed queue status"""
-
-    if key != API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid API key")
-    try:
-        queue_status = job_manager.get_queue_status_info()
-
-        # Get queued jobs
-        queued_jobs = job_manager.get_queued_jobs()
-
-        # Get current job info
-        current_job_info = None
-        if queue_status["current_job"]:
-            current_job_id = queue_status["current_job"]
-            job_meta = job_manager.get_job_from_celery(current_job_id)
-
-            current_job_info = {
-                "job_id": current_job_id,
-                "external_id": job_meta.external_id if job_meta else "unknown",
-                "start_time": (
-                    job_meta.start_time.isoformat()
-                    if job_meta and job_meta.start_time
-                    else None
-                ),
-            }
-
-        return {
-            "queue_size": queue_status["queue_length"],
-            "processing_jobs": 1 if queue_status["current_job"] else 0,
-            "current_job": current_job_info,
-            "queued_jobs": queued_jobs,
-            "failed_jobs": queue_status["failed_count"],
-        }
-
-    except Exception as e:
-        logger.error(f"Error getting queue status: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Error getting queue status: {str(e)}"
-        )

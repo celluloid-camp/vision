@@ -8,10 +8,7 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import logging
-import requests
 import os
-import tempfile
-from urllib.parse import urlparse
 import sys
 from datetime import datetime
 import signal
@@ -22,60 +19,17 @@ from PIL import Image
 from app.models.schemas import (
     DetectionResults,
 )
+from app.core.utils import (
+    get_log_level,
+    ensure_dir,
+    download_file,
+    download_video,
+    get_version,
+)
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+# Set up logging (level from LOG_LEVEL env, default INFO)
+logging.basicConfig(level=get_log_level())
 logger = logging.getLogger(__name__)
-
-
-def ensure_dir(directory: str) -> None:
-    """Ensure directory exists, create if it doesn't"""
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-
-
-def download_file(url: str, local_path: str) -> str:
-    """
-    Download file from URL and return local path
-    """
-    logger.info(f"Downloading file from {url}")
-
-    # Download with progress tracking
-    response = requests.get(url, stream=True)
-    response.raise_for_status()
-
-    total_size = int(response.headers.get("content-length", 0))
-    block_size = 1024 * 1024  # 1MB chunks
-
-    with open(local_path, "wb") as f:
-        downloaded = 0
-        for data in response.iter_content(block_size):
-            downloaded += len(data)
-            f.write(data)
-            if total_size > 0:
-                done = int(50 * downloaded / total_size)
-                sys.stdout.write(
-                    f"\rDownloading: [{'=' * done}{' ' * (50-done)}] {downloaded}/{total_size} bytes"
-                )
-                sys.stdout.flush()
-
-    print()  # New line after progress bar
-    logger.info(f"Download complete: {local_path}")
-    return local_path
-
-
-def download_video(url: str) -> str:
-    """
-    Download video from URL and return local path
-    """
-    # Create a temporary file
-    temp_dir = tempfile.gettempdir()
-    filename = os.path.basename(urlparse(url).path)
-    if not filename:
-        filename = "video.mp4"
-    local_path = os.path.join(temp_dir, filename)
-
-    return download_file(url, local_path)
 
 
 def get_model_path(model_type: str = "detector") -> str:
@@ -121,6 +75,10 @@ class ObjectTracker:
         self.class_counters = {}  # Separate counter for each class
 
         # Initialize MediaPipe Image Embedder
+        logger.info(
+            "Initializing Object Tracker with similarity threshold: %s",
+            similarity_threshold,
+        )
         model_path = get_model_path("embedder")
         base_options = python.BaseOptions(model_asset_path=model_path)
         options = vision.ImageEmbedderOptions(
@@ -362,7 +320,7 @@ class ObjectDetector:
         self,
         min_score: float = 0.8,
         output_path: str = "detections.json",
-        similarity_threshold: float = 0.5,
+        similarity_threshold: float = 0.2,
         external_id: str = None,
     ):
         # Initialize MediaPipe Object Detection
@@ -462,7 +420,7 @@ class ObjectDetector:
 
         # Initialize results dictionary in TAO format
         self.results = {
-            "version": "1.0",
+            "version": get_version(),
             "metadata": {
                 "video": {
                     "fps": fps,
@@ -470,11 +428,6 @@ class ObjectDetector:
                     "width": width,
                     "height": height,
                     "source": video_source_url if video_source_url else video_path,
-                },
-                "model": {
-                    "name": "efficientdet_lite0",
-                    "type": "object_detection",
-                    "version": "1.0",
                 },
                 "sprite": {
                     "path": "sprite.jpg",  # Just the filename, no path
