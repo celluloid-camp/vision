@@ -3,6 +3,32 @@
 This changelog is auto generated using release-it.
 
 
+## [1.3.0](https://github.com/celluloid-camp/vision/compare/v1.2.2...v1.3.0) (2026-02-22)
+
+### Features
+
+* Add queue_size attribute to HealthResponse model and update API endpoint for job results retrieval ([074d375](https://github.com/celluloid-camp/vision/commit/074d375e0bf2cd0073bdb1023ce822f671e79722))
+
+### Bug Fixes
+
+* Add missing newline at the end of __init__.py for consistency ([c3c89bd](https://github.com/celluloid-camp/vision/commit/c3c89bdd4e2c3879167a9e1dfac677e7c5e2a9b2))
+
+### Chores
+
+* Refactor logging setup to use dynamic log level from environment variable ([a2d2ec0](https://github.com/celluloid-camp/vision/commit/a2d2ec00855f8736fafdcb3e9cc32e1921a55416))
+
+### Code Refactoring
+
+* Remove InterruptHandler class and streamline video processing error handling ([1598370](https://github.com/celluloid-camp/vision/commit/159837090afc75ef8a56c3d348e89267b1d6fef1))
+* Remove test for queue_size from health check in test_api.py ([d65b17e](https://github.com/celluloid-camp/vision/commit/d65b17eeb922e4ef7b63916959e57844346d2e68))
+* Update API endpoint paths for job analysis and results retrieval ([26776ec](https://github.com/celluloid-camp/vision/commit/26776ecd23073bb1b5bd798aad4e5b330072b67f))
+* Update API endpoints and unify entry point for improved structure ([513071c](https://github.com/celluloid-camp/vision/commit/513071caf4f2962a23344932ef51cb1b173cea28))
+
+### Code Style Changes
+
+* Add newlines for consistency in multiple files and refactor code for improved readability ([23f95b9](https://github.com/celluloid-camp/vision/commit/23f95b9d30fff7043a950e919e9d5afa25d3337c))
+* Remove unnecessary newlines for improved readability in detect_objects.py ([79cb2ce](https://github.com/celluloid-camp/vision/commit/79cb2ce197b5fc6d9bbed932429be0f6a9cbd4b1))
+
 ## [1.2.2](https://github.com/celluloid-camp/vision/compare/v1.2.1...v1.2.2) (2026-02-22)
 
 ## [1.2.1](https://github.com/celluloid-camp/vision/compare/v1.2.0...v1.2.1) (2026-02-22)
