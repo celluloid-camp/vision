@@ -3,6 +3,12 @@
 This changelog is auto generated using release-it.
 
 
+## [1.2.0](https://github.com/celluloid-camp/vision/compare/v1.1.5...v1.2.0) (2026-02-22)
+
+### Features
+
+* Enhance deployment script and add Celery worker support ([40cf1f5](https://github.com/celluloid-camp/vision/commit/40cf1f52007ba8d628444f8f4565edde8be870f5))
+
 ## [1.1.5](https://github.com/celluloid-camp/vision/compare/v1.1.4...v1.1.5) (2026-02-16)
 
 ### Bug Fixes
