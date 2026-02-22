@@ -113,7 +113,25 @@ def process_video_task(self, job_data: dict):
             similarity_threshold=similarity_threshold,
             project_id=project_id,
         )
-        results = detector.process_video(video_path, video_url)
+
+        _last_reported = [0.0]
+
+        def _report_progress(pct: float):
+            # Report at most once per 5% increment to limit Redis writes
+            if pct - _last_reported[0] >= 5.0 or pct >= 100.0:
+                _last_reported[0] = pct
+                self.update_state(
+                    state="PROCESSING",
+                    meta={
+                        "job_id": job_id,
+                        "project_id": project_id,
+                        "status": "processing",
+                        "progress": round(pct, 1),
+                        "start_time": start_time,
+                    },
+                )
+
+        results = detector.process_video(video_path, video_url, progress_callback=_report_progress)
 
         # Save results to disk
         with open(output_path, "w") as f:

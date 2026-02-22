@@ -422,7 +422,7 @@ class ObjectDetector:
             return False
 
     def process_video(
-        self, video_path: str, video_source_url: str = None
+        self, video_path: str, video_source_url: str = None, progress_callback=None
     ) -> DetectionResults:
         """
         Process video and return detections in TAO JSON format
@@ -600,6 +600,8 @@ class ObjectDetector:
             progress = (frame_idx / self.frame_count) * 100
             sys.stdout.write(f"\rProcessing: {progress:.1f}%")
             sys.stdout.flush()
+            if progress_callback:
+                progress_callback(progress)
 
         cap.release()
 

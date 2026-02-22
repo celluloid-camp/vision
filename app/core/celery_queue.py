@@ -87,6 +87,19 @@ class CeleryJobManager:
                 job.status = "queued"
             elif celery_state in ("STARTED", "PROCESSING"):
                 job.status = "processing"
+                # Read live progress from Celery task state metadata and
+                # write it back into our Redis meta key so callers don't
+                # need to hit the Celery backend on every subsequent poll.
+                task_info = result.info
+                if task_info and isinstance(task_info, dict):
+                    live_progress = float(task_info.get("progress", meta.get("progress", 0.0)))
+                    if live_progress != float(meta.get("progress", 0.0)):
+                        meta["progress"] = live_progress
+                        if task_info.get("start_time") and not meta.get("start_time"):
+                            meta["start_time"] = task_info["start_time"]
+                        self.redis_conn.setex(
+                            self._job_key(job_id), 86400, json.dumps(meta)
+                        )
             elif celery_state == "SUCCESS":
                 job.status = "completed"
                 # Pull result_path and metadata from the task return value and
@@ -250,11 +263,46 @@ class CeleryJobManager:
             logger.warning(f"Could not cancel job {job_id}: {str(e)}")
 
     def get_queued_jobs(self):
-        """Get list of queued jobs with metadata"""
+        """Get list of queued jobs with metadata, ordered by broker queue position."""
         queued_jobs = []
         try:
+            # Read the actual Celery broker queue (Redis list) to get true order.
+            # Each entry is a JSON-encoded Celery message; we only need the task id.
+            broker_order: list[str] = []
+            try:
+                raw_messages = self.redis_conn.lrange(self.queue_name, 0, -1)
+                for raw in raw_messages:
+                    try:
+                        msg = json.loads(raw)
+                        # Kombu message: {"headers": {"id": "<task_id>"}, ...}
+                        task_id = (
+                            msg.get("headers", {}).get("id")
+                            or msg.get("properties", {}).get("correlation_id")
+                        )
+                        if task_id:
+                            broker_order.append(task_id)
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.warning(f"Could not read broker queue order: {e}")
+
+            # Fall back to all queued jobs sorted by start_time
             jobs = self.get_all_jobs()
             queued = [j for j in jobs if j.status == "queued"]
+            if broker_order:
+                # Sort by position in the broker queue; jobs not in the broker
+                # list (pre-fetched by worker) go to the end sorted by start_time.
+                def _order(job):
+                    try:
+                        return broker_order.index(job.job_id)
+                    except ValueError:
+                        return len(broker_order)
+
+                queued.sort(key=_order)
+            else:
+                # No broker order available — sort by enqueue time
+                queued.sort(key=lambda j: j.start_time or datetime.min)
+
             for i, job in enumerate(queued):
                 queued_jobs.append(
                     {
