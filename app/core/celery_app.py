@@ -23,4 +23,8 @@ celery_app.conf.update(
     task_track_started=True,
     task_default_queue=CELERY_QUEUE_NAME,
     result_expires=86400,  # Results expire after 24 hours
+    # Soft limit lets the task catch SoftTimeLimitExceeded and clean up.
+    # Hard limit (soft + 5 minutes) kills the process if cleanup stalls.
+    task_soft_time_limit=CELERY_TASK_TIMEOUT,
+    task_time_limit=CELERY_TASK_TIMEOUT + 300,
 )

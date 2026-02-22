@@ -8,7 +8,7 @@ from typing import List, Optional
 import redis
 from celery.result import AsyncResult
 
-from app.core.celery_app import CELERY_QUEUE_NAME, CELERY_TASK_TIMEOUT, celery_app
+from app.core.celery_app import CELERY_QUEUE_NAME, celery_app
 from app.models.schemas import JobStatus
 
 logger = logging.getLogger(__name__)
@@ -201,7 +201,7 @@ class CeleryJobManager:
                 "finished_count": 0,
             }
 
-    def enqueue_job(self, job: JobStatus, job_timeout: int = CELERY_TASK_TIMEOUT, result_ttl: int = 86400):
+    def enqueue_job(self, job: JobStatus):
         """Enqueue a job to the Celery queue"""
         try:
             from app.core.tasks import process_video_task
@@ -218,8 +218,6 @@ class CeleryJobManager:
                 args=[job_data],
                 task_id=job.job_id,
                 queue=self.queue_name,
-                soft_time_limit=job_timeout,
-                time_limit=job_timeout + 60,
             )
 
             # Persist job metadata so it can be queried before the task starts
