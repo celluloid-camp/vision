@@ -55,7 +55,7 @@ jobs:
             'until docker exec redis redis-cli ping | grep -q PONG; do sleep 1; done'
           echo "Redis is ready"
 
-      - name: Start FastAPI application container
+      - name: Start application container (api + worker, default both)
         run: |
           docker run -d --name vision-api \
             --network vision-net \
@@ -65,20 +65,6 @@ jobs:
             -e CELERY_QUEUE_NAME=celluloid_video_processing \
             -e CELERY_TASK_TIMEOUT=300 \
             vision:test
-
-      - name: Start Celery worker container
-        run: |
-          docker run -d --name vision-worker \
-            --network vision-net \
-            -e REDIS_URL=redis://redis:6379 \
-            -e API_KEY=${{ env.API_KEY }} \
-            -e CELERY_QUEUE_NAME=celluloid_video_processing \
-            -e CELERY_TASK_TIMEOUT=300 \
-            vision:test \
-            celery -A app.core.celery_app worker \
-              --loglevel=info \
-              --queues=celluloid_video_processing \
-              --concurrency=1
 
       - name: Wait for API to be ready
         run: |
@@ -99,14 +85,12 @@ jobs:
         run: |
           echo "=== vision-api logs ==="
           docker logs vision-api || true
-          echo "=== vision-worker logs ==="
-          docker logs vision-worker || true
           echo "=== redis logs ==="
           docker logs redis || true
 
       - name: Cleanup containers and network
         if: always()
         run: |
-          docker stop vision-api vision-worker redis || true
-          docker rm vision-api vision-worker redis || true
+          docker stop vision-api redis || true
+          docker rm vision-api redis || true
           docker network rm vision-net || true

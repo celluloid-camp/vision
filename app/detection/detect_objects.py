@@ -83,11 +83,11 @@ def get_model_path(model_type: str = "detector") -> str:
     Get the path to the model file, downloading it if necessary
     """
     if model_type == "detector":
-        model_url = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float32/latest/efficientdet_lite0.tflite"
-        model_name = "efficientdet_lite0.tflite"
+        model_url = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite2/float32/latest/efficientdet_lite2.tflite"
+        model_name = "efficientdet_lite2.tflite"
     elif model_type == "embedder":
-        model_url = "https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_small/float32/latest/mobilenet_v3_small.tflite"
-        model_name = "mobilenet_v3_small.tflite"
+        model_url = "https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_large/float32/latest/mobilenet_v3_large.tflite"
+        model_name = "mobilenet_v3_large.tflite"
     elif model_type == "face":
         model_url = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite"
         model_name = "detector.tflite"
@@ -343,7 +343,9 @@ class SpriteGenerator:
                     (0, 0, self.max_width, actual_used_height)
                 )
             self.sprite_image.save(output_path, format="JPEG", quality=50)
-            logger.info(f"Sprite saved to: {output_path} (dimensions: {self.sprite_image.size})")
+            logger.info(
+                f"Sprite saved to: {output_path} (dimensions: {self.sprite_image.size})"
+            )
 
 
 class ObjectDetector:
@@ -414,7 +416,7 @@ class ObjectDetector:
             # Return True if at least one face is detected
             has_face = len(detection_result.detections) > 0
             if has_face:
-                logger.debug(f"Face detected in person region - confidence improved")
+                logger.debug("Face detected in person region - confidence improved")
             return has_face
 
         except Exception as e:
@@ -541,7 +543,7 @@ class ObjectDetector:
                         )
 
                         # Extract the detected object region
-                        object_region = frame[y : y + h, x : x + w]
+                        object_region = frame[y: y + h, x: x + w]
                         if object_region.size > 0:  # Check if region is valid
                             # For person objects, check if they contain a face to improve accuracy
                             if class_name == "person":
@@ -607,6 +609,7 @@ class ObjectDetector:
 
         # Save the sprite image to output_path
         import os
+
         sprite_output_path = os.path.splitext(self.output_path)[0] + ".sprite.jpg"
         self.sprite_generator.save_sprite(sprite_output_path)
         sprite_url = os.path.basename(sprite_output_path)  # Just filename
@@ -625,7 +628,8 @@ class ObjectDetector:
             "duration_seconds": processing_time,
             "frames_processed": self.processed_frames,
             "frames_with_detections": self.frames_with_detections,
-            "processing_speed": self.processed_frames / processing_time,  # frames per second
+            "processing_speed": self.processed_frames
+            / processing_time,  # frames per second
             "detection_statistics": self.detection_stats,
         }
 
@@ -652,7 +656,7 @@ class ObjectDetector:
             )
 
         # Print detection statistics
-        print(f"\nDetection Statistics:")
+        print("\nDetection Statistics:")
         print(f"  Total detections: {self.detection_stats['total_detections']}")
         print(f"  Person detections: {self.detection_stats['person_detections']}")
         print(f"    - With face: {self.detection_stats['person_with_face']}")
@@ -660,7 +664,7 @@ class ObjectDetector:
             f"    - Without face (filtered out): {self.detection_stats['person_without_face']}"
         )
         print(f"  Other detections: {self.detection_stats['other_detections']}")
-        print(f"  By class:")
+        print("  By class:")
         for class_name, count in sorted(self.detection_stats["class_counts"].items()):
             print(f"    - {class_name}: {count}")
 

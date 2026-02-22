@@ -184,3 +184,5 @@ src/images/
 models/*.tflite
 outputs/
 include
+
+app/detection/models/*.tflite

@@ -108,7 +108,7 @@ The project uses a flat structure with all Python modules in the root directory:
 
 #### 1. API Layer (app.py)
 - RESTful API built with FastAPI
-- Endpoints: `/health`, `/analyse`, `/status/{job_id}`, `/results/{project_id}/{job_id}`
+- Endpoints: `/health`, `/analyse`, `/status/{job_id}`, `/results/{external_id}/{job_id}`
 - API key authentication via `X-API-Key` header
 - CORS middleware enabled
 - Scalar API documentation at `/scalar`
@@ -150,7 +150,7 @@ DetectionResults:
 
 #### Job Status
 - States: queued, processing, completed, failed
-- Tracks: job_id, project_id, video_url, similarity_threshold
+- Tracks: job_id, external_id, video_url, similarity_threshold
 - Metadata: progress, timestamps, error messages
 
 ### API Patterns
@@ -159,10 +159,10 @@ DetectionResults:
 1. Client POSTs to `/analyse` with video URL and parameters
 2. Job is queued in Redis Queue (RQ)
 3. Worker processes video asynchronously
-4. Results stored with project_id and job_id as keys
+4. Results stored with external_id and job_id as keys
 5. Optional callback URL is notified on completion
 6. Client polls `/status/{job_id}` or gets notified via callback
-7. Client retrieves results from `/results/{project_id}/{job_id}`
+7. Client retrieves results from `/results/{external_id}/{job_id}`
 
 #### Error Handling
 - Use HTTPException with appropriate status codes

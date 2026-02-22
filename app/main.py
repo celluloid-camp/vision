@@ -1,4 +1,6 @@
 """Main FastAPI application"""
+
+import json
 import os
 import logging
 from contextlib import asynccontextmanager
@@ -25,7 +27,10 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup
     api_key = os.getenv("API_KEY")
-    logger.info("Starting up FastAPI web service with Celery... API key configured: %s", "Yes" if api_key else "No")
+    logger.info(
+        "Starting up FastAPI web service with Celery... API key configured: %s",
+        "Yes" if api_key else "No",
+    )
 
     # Create output directory
     os.makedirs("outputs", exist_ok=True)
@@ -40,6 +45,15 @@ async def lifespan(app: FastAPI):
 
     # Clean up stale jobs
     job_manager.cleanup_stale_jobs()
+
+    # Save OpenAPI schema to file
+    openapi_path = os.getenv("OPENAPI_JSON_PATH", "openapi.json")
+    try:
+        with open(openapi_path, "w") as f:
+            json.dump(app.openapi(), f, indent=2)
+        logger.info("OpenAPI schema saved to %s", openapi_path)
+    except Exception as e:
+        logger.warning("Failed to save OpenAPI schema: %s", e)
 
     yield
 
