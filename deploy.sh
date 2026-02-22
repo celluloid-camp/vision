@@ -15,8 +15,8 @@ echo "🛑 Stopping existing container..."
 docker stop celluloid-video-analysis-api 2>/dev/null || true
 docker rm celluloid-video-analysis-api 2>/dev/null || true
 
-# Run the container
-echo "🏃 Starting container..."
+# Run one container (api + worker, default: both)
+echo "🏃 Starting container (api + worker)..."
 docker run -d \
     --name celluloid-video-analysis-api \
     --restart unless-stopped \
@@ -25,6 +25,8 @@ docker run -d \
     -v "$(pwd)/models:/app/models:ro" \
     -e REDIS_URL="redis://host.docker.internal:6379/0" \
     -e API_KEY="xxx" \
+    -e CELERY_QUEUE_NAME="celluloid_video_processing" \
+    -e CELERY_TASK_TIMEOUT="300" \
     celluloid-video-analysis-api
 
 # Wait for service to be ready
@@ -40,7 +42,7 @@ done
 
 # Show container status
 echo "📊 Container status:"
-docker ps --filter name=celluloid-video-analysis-api
+docker ps --filter name=celluloid-video-analysis
 
 echo ""
 echo "🎉 Deployment complete!"
@@ -48,7 +50,7 @@ echo "📡 API is available at: http://localhost:8081"
 echo "🔍 Health check at: http://localhost:8081/health"
 echo ""
 echo "📋 Useful commands:"
-echo "   View logs: docker logs -f celluloid-video-analysis-api"
-echo "   Stop service: docker stop celluloid-video-analysis-api"
-echo "   Restart service: docker restart celluloid-video-analysis-api"
-echo "   Remove service: docker rm -f celluloid-video-analysis-api" 
+echo "   View logs:   docker logs -f celluloid-video-analysis-api"
+echo "   Stop:       docker stop celluloid-video-analysis-api"
+echo "   Restart:    docker restart celluloid-video-analysis-api"
+echo "   Remove:     docker rm -f celluloid-video-analysis-api" 

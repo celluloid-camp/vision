@@ -42,7 +42,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 # Copy dependency files and package structure for better caching
 COPY pyproject.toml README.md ./
 COPY app ./app
-COPY analyse.py run_app.py ./
+COPY analyse.py run_app.py run_worker.py entrypoint.sh ./
 
 # Install Python dependencies using uv
 RUN uv pip install --system --no-cache -e .
@@ -53,6 +53,9 @@ COPY . .
 # Create outputs directory
 RUN mkdir -p outputs
 
+# Entrypoint: api | worker | both
+RUN chmod +x /app/entrypoint.sh
+
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 
@@ -61,10 +64,7 @@ USER appuser
 # Expose port
 EXPOSE 8081
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8081/health || exit 1
-
-# Run the startup script
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8081"]
+# both = worker + uvicorn (default), api = uvicorn only, worker = Celery only
+ENTRYPOINT ["./entrypoint.sh"]
+CMD ["both"]
 

@@ -25,7 +25,7 @@ POST /analyse
 Content-Type: application/json
 
 {
-  "project_id": "my_project_001",
+  "external_id": "my_project_001",
   "video_url": "https://example.com/video.mp4",
   "similarity_threshold": 0.6,
   "callback_url": "https://myapp.com/webhooks/analysis-complete"
@@ -34,7 +34,7 @@ Content-Type: application/json
 
 **Parameters**:
 
-- `project_id` (required): Unique identifier for organizing results
+- `external_id` (required): Unique identifier for organizing results
 - `video_url` (required): URL or local path to video file
 - `similarity_threshold` (optional): Threshold for object tracking (0.0-1.0,
   default: 0.5)
@@ -63,7 +63,7 @@ GET /status/{job_id}
 ```json
 {
   "job_id": "550e8400-e29b-41d4-a716-446655440000",
-  "project_id": "my_project_001",
+  "external_id": "my_project_001",
   "video_url": "https://example.com/video.mp4",
   "similarity_threshold": 0.6,
   "status": "processing",
@@ -83,7 +83,7 @@ GET /status/{job_id}
 ```json
 {
   "job_id": "550e8400-e29b-41d4-a716-446655440000",
-  "project_id": "my_project_001",
+  "external_id": "my_project_001",
   "video_url": "https://example.com/video.mp4",
   "similarity_threshold": 0.6,
   "status": "queued",
@@ -111,12 +111,12 @@ GET /results/{job_id}
 #### 5. List Jobs
 
 ```http
-GET /jobs?project_id=my_project_001&status=completed
+GET /jobs?external_id=my_project_001&status=completed
 ```
 
 **Query Parameters**:
 
-- `project_id` (optional): Filter by project ID
+- `external_id` (optional): Filter by project ID
 - `status` (optional): Filter by job status (queued, processing, completed,
   failed)
 
@@ -127,7 +127,7 @@ GET /jobs?project_id=my_project_001&status=completed
   "jobs": [
     {
       "job_id": "550e8400-e29b-41d4-a716-446655440000",
-      "project_id": "my_project_001",
+      "external_id": "my_project_001",
       "status": "completed",
       "progress": 100.0,
       "start_time": "2024-01-15T10:30:00",
@@ -154,19 +154,19 @@ GET /queue
   "processing_jobs": 1,
   "current_job": {
     "job_id": "550e8400-e29b-41d4-a716-446655440000",
-    "project_id": "my_project_001",
+    "external_id": "my_project_001",
     "start_time": "2024-01-15T10:30:00"
   },
   "queued_jobs": [
     {
       "job_id": "550e8400-e29b-41d4-a716-446655440001",
-      "project_id": "my_project_002",
+      "external_id": "my_project_002",
       "queue_position": 1,
       "estimated_wait_time": "~5 minutes"
     },
     {
       "job_id": "550e8400-e29b-41d4-a716-446655440002",
-      "project_id": "my_project_003",
+      "external_id": "my_project_003",
       "queue_position": 2,
       "estimated_wait_time": "~10 minutes"
     }
@@ -197,7 +197,7 @@ DELETE /jobs/{job_id}
    curl -X POST http://localhost:5000/analyse \
      -H "Content-Type: application/json" \
      -d '{
-       "project_id": "test_project",
+       "external_id": "test_project",
        "video_url": "https://storage.googleapis.com/mediapipe-assets/portrait.mp4",
        "similarity_threshold": 0.6,
        "callback_url": "https://myapp.com/webhooks/analysis-complete"
@@ -227,7 +227,7 @@ import time
 
 # Start detection
 response = requests.post('http://localhost:5000/analyse', json={
-    'project_id': 'my_project',
+    'external_id': 'my_project',
     'video_url': 'https://example.com/video.mp4',
     'similarity_threshold': 0.6,
     'callback_url': 'https://myapp.com/webhooks/analysis-complete'
@@ -282,7 +282,7 @@ The web service implements a queue system to ensure only one job runs at a time:
 
 ## Output Structure
 
-Results are saved in the `outputs/{project_id}/` directory with the following
+Results are saved in the `outputs/{external_id}/` directory with the following
 structure:
 
 ```
@@ -311,7 +311,7 @@ URL when the analysis completes or fails.
 ```json
 {
   "job_id": "550e8400-e29b-41d4-a716-446655440000",
-  "project_id": "my_project_001",
+  "external_id": "my_project_001",
   "status": "completed",
   "timestamp": "2024-01-15T10:35:00",
   "results": {
@@ -331,7 +331,7 @@ URL when the analysis completes or fails.
 ```json
 {
   "job_id": "550e8400-e29b-41d4-a716-446655440000",
-  "project_id": "my_project_001",
+  "external_id": "my_project_001",
   "status": "failed",
   "timestamp": "2024-01-15T10:35:00",
   "error": "Failed to download video: HTTP 404 Not Found"

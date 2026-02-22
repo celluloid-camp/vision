@@ -1,0 +1,96 @@
+---
+name: API Tests
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '**.py'
+      - 'Dockerfile'
+      - 'pyproject.toml'
+      - '.github/workflows/test.yml'
+  workflow_dispatch:
+
+jobs:
+  api-tests:
+    runs-on: ubuntu-latest
+
+    env:
+      API_KEY: test-key-for-ci
+      BASE_URL: http://localhost:8081
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: vision:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Create Docker network
+        run: docker network create vision-net
+
+      - name: Start Redis container
+        run: |
+          docker run -d --name redis \
+            --network vision-net \
+            redis:7-alpine
+
+      - name: Wait for Redis to be ready
+        run: |
+          timeout 30 bash -c \
+            'until docker exec redis redis-cli ping | grep -q PONG; do sleep 1; done'
+          echo "Redis is ready"
+
+      - name: Start application container (api + worker, default both)
+        run: |
+          docker run -d --name vision-api \
+            --network vision-net \
+            -p 8081:8081 \
+            -e REDIS_URL=redis://redis:6379 \
+            -e API_KEY=${{ env.API_KEY }} \
+            -e CELERY_QUEUE_NAME=celluloid_video_processing \
+            -e CELERY_TASK_TIMEOUT=300 \
+            vision:test
+
+      - name: Wait for API to be ready
+        run: |
+          echo "Waiting for FastAPI to start..."
+          timeout 120 bash -c \
+            'until curl -sf http://localhost:8081/health; do sleep 2; done'
+          echo ""
+          echo "API is ready"
+
+      - name: Install test dependencies
+        run: pip install pytest requests
+
+      - name: Run API tests
+        run: pytest app/tests/test_api.py -v --tb=short
+
+      - name: Show container logs on failure
+        if: failure()
+        run: |
+          echo "=== vision-api logs ==="
+          docker logs vision-api || true
+          echo "=== redis logs ==="
+          docker logs redis || true
+
+      - name: Cleanup containers and network
+        if: always()
+        run: |
+          docker stop vision-api redis || true
+          docker rm vision-api redis || true
+          docker network rm vision-net || true

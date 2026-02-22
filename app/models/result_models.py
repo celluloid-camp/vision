@@ -4,21 +4,27 @@ from urllib.parse import urlparse
 import os
 
 
+class JobStats(BaseModel):
+    queued: int
+    processing: int
+    completed: int
+    failed: int
+
+
 # --- Pydantic models for OpenAPI ---
 class HealthResponse(BaseModel):
     status: str
     timestamp: str
     queue_size: int
     processing_jobs: int
-    current_job: Optional[str]
-
-
-class ErrorResponse(BaseModel):
-    error: str
+    current_job: Optional[str] = None
+    redis_connected: bool = False
+    job_stats: Optional[JobStats] = None
+    error: Optional[str] = None
 
 
 class AnalysisRequest(BaseModel):
-    project_id: str = Field(..., description="Project identifier")
+    external_id: str = Field(..., description="Project identifier")
     video_url: str = Field(..., description="URL or path to video file")
     similarity_threshold: float = Field(
         0.5, ge=0, le=1, description="Similarity threshold for object tracking"
@@ -41,33 +47,31 @@ class AnalysisResponse(BaseModel):
     status: str
     queue_position: int
     message: str
-    callback_url: Optional[str]
+    callback_url: Optional[str] = None
 
 
 class JobStatusResponse(BaseModel):
     job_id: str
-    project_id: str
+    external_id: str
     video_url: str
     similarity_threshold: float
     status: str
     progress: float
-    queue_position: Optional[int]
-    estimated_wait_time: Optional[str]
-    start_time: Optional[str]
-    end_time: Optional[str]
-    result_path: Optional[str]
-    metadata: Optional[dict]
-    error_message: Optional[str]
+    queue_position: int = 0
+    estimated_wait_time: str = "00:00:00"
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    error_message: Optional[str] = None
 
 
 class JobInfo(BaseModel):
     job_id: str
-    project_id: str
+    external_id: str
     status: str
     progress: float
-    queue_position: Optional[int]
-    start_time: Optional[str]
-    end_time: Optional[str]
+    queue_position: Optional[int] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
 
 
 class JobsListResponse(BaseModel):
@@ -79,26 +83,23 @@ class JobsListResponse(BaseModel):
 
 class QueuedJob(BaseModel):
     job_id: str
-    project_id: str
+    external_id: str
     queue_position: int
     estimated_wait_time: str
 
 
 class CurrentJob(BaseModel):
     job_id: str
-    project_id: str
-    start_time: Optional[str]
+    external_id: str
+    start_time: Optional[str] = None
 
 
 class QueueStatusResponse(BaseModel):
     queue_size: int
     processing_jobs: int
-    current_job: Optional[CurrentJob]
+    current_job: Optional[CurrentJob] = None
     queued_jobs: list[QueuedJob]
-
-
-class DeleteJobResponse(BaseModel):
-    message: str
+    failed_jobs: int = 0
 
 
 # Pydantic models for OpenAPI schema (matching TypedDict structure)
@@ -174,6 +175,7 @@ class DetectionResultsModel(BaseModel):
     frames: list[DetectionFrameModel]
 
 
-# Pydantic models for path parameters
-class JobIdPath(BaseModel):
-    job_id: str = Field(..., description="job id")
+class JobResultsResponse(BaseModel):
+    status: str
+    data: Optional[DetectionResultsModel] = None
+    error_message: Optional[str] = None

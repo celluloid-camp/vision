@@ -1,7 +1,8 @@
 """Main FastAPI application"""
+
+import json
 import os
 import logging
-import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -13,7 +14,7 @@ from datetime import datetime
 
 from app.api.routes import router
 from app.core.dependencies import job_manager
-from app.core.background import process_rq_jobs, shutdown_process_pool
+from app.core.background import shutdown_process_pool
 from app.core.utils import get_version
 
 # Set up logging
@@ -26,7 +27,10 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup
     api_key = os.getenv("API_KEY")
-    logger.info("Starting up FastAPI web service with RQ... API key configured: %s", "Yes" if api_key else "No")
+    logger.info(
+        "Starting up FastAPI web service with Celery... API key configured: %s",
+        "Yes" if api_key else "No",
+    )
 
     # Create output directory
     os.makedirs("outputs", exist_ok=True)
@@ -42,8 +46,14 @@ async def lifespan(app: FastAPI):
     # Clean up stale jobs
     job_manager.cleanup_stale_jobs()
 
-    # Start background job processor
-    asyncio.create_task(process_rq_jobs())
+    # Save OpenAPI schema to file
+    openapi_path = os.getenv("OPENAPI_JSON_PATH", "openapi.json")
+    try:
+        with open(openapi_path, "w") as f:
+            json.dump(app.openapi(), f, indent=2)
+        logger.info("OpenAPI schema saved to %s", openapi_path)
+    except Exception as e:
+        logger.warning("Failed to save OpenAPI schema: %s", e)
 
     yield
 
@@ -103,7 +113,7 @@ app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
 # Webhook model for documentation
 class JobCompletedWebhook(BaseModel):
     job_id: str
-    project_id: str
+    external_id: str
     status: str
     timestamp: datetime
 
