@@ -18,6 +18,7 @@ from app.models.result_models import (
     AnalysisResponse,
     JobStatusResponse,
     JobResultsResponse,
+    ScenesRequest,
 )
 from app.models.schemas import JobStatus
 
@@ -171,6 +172,105 @@ async def create_analysis_task(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
+@router.post(
+    "/job/scenes",
+    response_model=AnalysisResponse,
+    status_code=202,
+    operation_id="create_scenes_job",
+    summary="Create a scenes detection task for a video",
+    tags=["scenes"],
+)
+async def create_scenes_task(
+    body: ScenesRequest, key: Annotated[str, Depends(header_scheme)]
+):
+    """Start scene detection on a video"""
+
+    if key != API_KEY:
+        logger.error(f"Invalid API key: {key}")
+        raise HTTPException(status_code=401, detail=f"Invalid API key: {key}")
+
+    try:
+        # Check if there's already a job for this external_id
+        all_jobs = job_manager.get_all_jobs()
+        existing_jobs = [
+            job for job in all_jobs if job.external_id == body.external_id and getattr(job, "job_type", "analyse") == "scenes"
+        ]
+
+        # Check for active jobs (queued or processing)
+        active_jobs = [
+            job for job in existing_jobs if job.status in ["queued", "processing"]
+        ]
+        if active_jobs:
+            existing_job = active_jobs[0]
+            logger.info(
+                f"Returning existing active scenes job {existing_job.job_id} for project {body.external_id}"
+            )
+            return {
+                "job_id": existing_job.job_id,
+                "status": existing_job.status,
+                "queue_position": 1,
+                "message": f"Project {body.external_id} already has an active scenes job",
+                "callback_url": existing_job.callback_url,
+            }
+
+        # Check for recently completed jobs (within last hour)
+        recent_completed = [
+            job
+            for job in existing_jobs
+            if job.status == "completed"
+            and job.end_time
+            and (datetime.now() - job.end_time).total_seconds() < 3600
+        ]
+        if recent_completed:
+            existing_job = recent_completed[0]
+            logger.info(
+                f"Returning recently completed scenes job {existing_job.job_id} for project {body.external_id}"
+            )
+            return {
+                "job_id": existing_job.job_id,
+                "status": existing_job.status,
+                "queue_position": 0,
+                "message": f"Project {body.external_id} scenes detection was recently completed",
+                "callback_url": existing_job.callback_url,
+            }
+
+        # Generate unique job ID
+        job_id = str(uuid.uuid4())
+
+        # Create job status
+        job = JobStatus(
+            job_id,
+            body.external_id,
+            body.video_url,
+            0.0,
+            body.callback_url,
+            job_type="scenes",
+        )
+        job.status = "queued"
+        job.start_time = datetime.now()
+
+        # Add job to Celery queue using the job manager
+        job_manager.enqueue_scenes_job(job, threshold=body.threshold)
+
+        logger.info(f"Started scenes detection job {job_id} for project {body.external_id}")
+        if body.callback_url:
+            logger.info(f"Callback URL configured: {body.callback_url}")
+
+        return {
+            "job_id": job_id,
+            "status": "queued",
+            "queue_position": 1,
+            "message": "Scenes detection job added to queue",
+            "callback_url": body.callback_url,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting scenes detection: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
 @router.get(
     "/status/{job_id}",
     operation_id="get_job_status",
@@ -199,6 +299,7 @@ async def get_job_status(job_id: str):
             "job_id": job.job_id,
             "external_id": job.external_id,
             "status": job.status,
+            "job_type": getattr(job, "job_type", "analyse"),
             "progress": job.progress,
             "queue_position": queue_position,
             "estimated_wait_time": estimated_wait_time,
@@ -227,26 +328,27 @@ async def get_job_results(job_id: str):
     try:
         job = job_manager.get_job_from_celery(job_id)
         if not job:
-            return {"status": "not-found", "data": None}
+            return {"status": "not-found", "job_type": "analyse", "data": None}
 
         if job.status == "failed":
             return {
                 "status": "failed",
+                "job_type": getattr(job, "job_type", "analyse"),
                 "data": None,
                 "error_message": job.error_message or "Unknown error",
             }
 
         if job.status in ("queued", "processing"):
-            return {"status": job.status, "data": None}
+            return {"status": job.status, "job_type": getattr(job, "job_type", "analyse"), "data": None}
 
         # completed — load result file
         if not job.result_path or not os.path.exists(job.result_path):
-            return {"status": "not-found", "data": None}
+            return {"status": "not-found", "job_type": getattr(job, "job_type", "analyse"), "data": None}
 
         with open(job.result_path) as f:
             result_data = json.load(f)
 
-        return {"status": "completed", "data": result_data}
+        return {"status": "completed", "job_type": getattr(job, "job_type", "analyse"), "data": result_data}
 
     except Exception as e:
         logger.error(f"Error reading results for job {job_id}: {str(e)}")

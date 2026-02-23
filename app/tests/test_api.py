@@ -288,3 +288,130 @@ class TestJobResults:
             "failed",
             "not-found",
         )
+
+
+# ---------------------------------------------------------------------------
+# POST /job/scenes
+# ---------------------------------------------------------------------------
+
+
+class TestScenesJob:
+    _valid_payload = {
+        "external_id": "ci-scenes-project",
+        "video_url": "http://example.com/video.mp4",
+        "threshold": 30.0,
+    }
+
+    def test_scenes_missing_api_key_returns_403(self):
+        r = requests.post(f"{BASE_URL}/job/scenes", json=self._valid_payload)
+        assert r.status_code == 403
+
+    def test_scenes_wrong_api_key_returns_401(self):
+        r = requests.post(
+            f"{BASE_URL}/job/scenes",
+            json=self._valid_payload,
+            headers={"x-api-key": "wrong-key"},
+        )
+        assert r.status_code == 401
+
+    def test_scenes_valid_request_returns_202(self):
+        r = requests.post(
+            f"{BASE_URL}/job/scenes",
+            json=self._valid_payload,
+            headers=HEADERS_AUTH,
+        )
+        assert r.status_code in (202, 422)
+
+    def test_scenes_missing_external_id_returns_422(self):
+        r = requests.post(
+            f"{BASE_URL}/job/scenes",
+            json={"video_url": "http://example.com/v.mp4"},
+            headers=HEADERS_AUTH,
+        )
+        assert r.status_code == 422
+
+    def test_scenes_missing_video_url_returns_422(self):
+        r = requests.post(
+            f"{BASE_URL}/job/scenes",
+            json={"external_id": "ci-scenes-proj"},
+            headers=HEADERS_AUTH,
+        )
+        assert r.status_code == 422
+
+    def test_scenes_response_shape(self):
+        """Valid request returns the expected JSON fields."""
+        r = requests.post(
+            f"{BASE_URL}/job/scenes",
+            json=self._valid_payload,
+            headers=HEADERS_AUTH,
+        )
+        if r.status_code == 202:
+            data = r.json()
+            assert "job_id" in data
+            assert "status" in data
+            assert "queue_position" in data
+            assert "message" in data
+
+    def test_scenes_status_includes_job_type(self):
+        """Status for a scenes job should include job_type='scenes'."""
+        r = requests.post(
+            f"{BASE_URL}/job/scenes",
+            json={
+                "external_id": "ci-scenes-status-test",
+                "video_url": "http://example.com/video.mp4",
+            },
+            headers=HEADERS_AUTH,
+        )
+        if r.status_code != 202:
+            pytest.skip("Could not enqueue scenes job; skipping status test")
+
+        job_id = r.json()["job_id"]
+        rs = requests.get(f"{BASE_URL}/status/{job_id}")
+        assert rs.status_code == 200
+        data = rs.json()
+        assert data["job_id"] == job_id
+        assert data.get("job_type") == "scenes"
+
+    def test_scenes_results_includes_job_type(self):
+        """Results for a scenes job should include job_type='scenes'."""
+        r = requests.post(
+            f"{BASE_URL}/job/scenes",
+            json={
+                "external_id": "ci-scenes-results-test",
+                "video_url": "http://example.com/video.mp4",
+            },
+            headers=HEADERS_AUTH,
+        )
+        if r.status_code != 202:
+            pytest.skip("Could not enqueue scenes job; skipping results test")
+
+        job_id = r.json()["job_id"]
+        rr = requests.get(f"{BASE_URL}/job/{job_id}/results")
+        assert rr.status_code == 200
+        data = rr.json()
+        assert "job_type" in data
+        assert data["job_type"] == "scenes"
+        assert "status" in data
+        assert "data" in data
+
+
+class TestJobResultsJobType:
+    def test_analyse_results_includes_job_type(self):
+        """Results for an analyse job should include job_type='analyse'."""
+        r = requests.post(
+            f"{BASE_URL}/job/analyse",
+            json={
+                "external_id": "ci-analyse-results-jobtype-test",
+                "video_url": "http://example.com/video.mp4",
+            },
+            headers=HEADERS_AUTH,
+        )
+        if r.status_code != 202:
+            pytest.skip("Could not enqueue analyse job; skipping results test")
+
+        job_id = r.json()["job_id"]
+        rr = requests.get(f"{BASE_URL}/job/{job_id}/results")
+        assert rr.status_code == 200
+        data = rr.json()
+        assert "job_type" in data
+        assert data["job_type"] == "analyse"

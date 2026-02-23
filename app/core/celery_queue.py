@@ -47,6 +47,7 @@ class CeleryJobManager:
             "video_url": job.video_url,
             "similarity_threshold": float(job.similarity_threshold),
             "callback_url": job.callback_url,
+            "job_type": getattr(job, "job_type", "analyse"),
             "status": job.status,
             "progress": float(job.progress),
             "result_path": job.result_path,
@@ -78,6 +79,7 @@ class CeleryJobManager:
                 video_url=meta.get("video_url", "unknown"),
                 similarity_threshold=float(meta.get("similarity_threshold", 0.0)),
                 callback_url=meta.get("callback_url"),
+                job_type=meta.get("job_type", "analyse"),
             )
 
             # Determine status from Celery task state
@@ -251,6 +253,34 @@ class CeleryJobManager:
             return result
         except Exception as e:
             logger.error(f"Error enqueueing job {job.job_id}: {str(e)}")
+            raise
+
+    def enqueue_scenes_job(self, job: JobStatus, threshold: float = 30.0):
+        """Enqueue a scenes detection job to the Celery queue"""
+        try:
+            from app.core.tasks import process_scenes_task
+
+            job_data = {
+                "job_id": job.job_id,
+                "external_id": job.external_id,
+                "video_url": job.video_url,
+                "threshold": threshold,
+                "callback_url": job.callback_url,
+            }
+
+            result = process_scenes_task.apply_async(
+                args=[job_data],
+                task_id=job.job_id,
+                queue=self.queue_name,
+            )
+
+            # Persist job metadata so it can be queried before the task starts
+            self._save_job_meta(job)
+
+            logger.info(f"Enqueued scenes job {job.job_id} to Celery queue {self.queue_name}")
+            return result
+        except Exception as e:
+            logger.error(f"Error enqueueing scenes job {job.job_id}: {str(e)}")
             raise
 
     def delete_job(self, job_id: str):
