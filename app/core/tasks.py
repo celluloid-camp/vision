@@ -13,6 +13,7 @@ import requests
 from app.core.celery_app import celery_app
 from app.core.utils import download_video
 from app.detection.detect_objects import ObjectDetector
+from app.detection.scenes import detect_scenes_from_file
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +203,122 @@ def process_video_task(self, job_data: dict):
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Job {job_id} failed: {error_msg}")
+        logger.error(traceback.format_exc())
+
+        # Send failure callback
+        if callback_url:
+            _send_callback_sync(
+                job_id, external_id, callback_url, "failed", error=error_msg
+            )
+
+        raise
+
+
+@celery_app.task(bind=True, name="app.core.tasks.process_scenes_task")
+def process_scenes_task(self, job_data: dict):
+    """Celery task for processing a scenes detection job"""
+    job_id = job_data["job_id"]
+    external_id = job_data["external_id"]
+    video_url = job_data["video_url"]
+    threshold = float(job_data.get("threshold", 30.0))
+    callback_url = job_data.get("callback_url")
+    start_time = datetime.now().isoformat()
+
+    self.update_state(
+        state="PROCESSING",
+        meta={
+            "job_id": job_id,
+            "external_id": external_id,
+            "video_url": video_url,
+            "threshold": threshold,
+            "callback_url": callback_url,
+            "status": "processing",
+            "progress": 0.0,
+            "start_time": start_time,
+        },
+    )
+
+    try:
+        # Create output directory for this project
+        output_dir = os.path.join("outputs", external_id)
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Generate output filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_filename = f"scenes_{job_id}_{timestamp}.json"
+        output_path = os.path.join(output_dir, output_filename)
+
+        # Download video if it's a URL
+        if video_url.startswith(("http://", "https://")):
+            video_path = download_video(video_url)
+        else:
+            video_path = video_url
+
+        self.update_state(
+            state="PROCESSING",
+            meta={
+                "job_id": job_id,
+                "external_id": external_id,
+                "status": "processing",
+                "progress": 10.0,
+                "start_time": start_time,
+            },
+        )
+
+        # Detect scenes
+        results = detect_scenes_from_file(video_path, threshold=threshold)
+
+        if results is None:
+            raise ValueError("Scene detection returned no results")
+
+        # Save results to disk
+        with open(output_path, "w") as f:
+            json.dump(results.model_dump(), f, indent=2)
+
+        logger.info(f"Scene detection result file saved to: {output_path}")
+
+        metadata = {
+            "total_scenes": results.total_scenes,
+        }
+
+        end_time = datetime.now().isoformat()
+
+        logger.info(f"Scenes job {job_id} completed successfully")
+
+        # Send completion callback
+        if callback_url:
+            _send_callback_sync(
+                job_id,
+                external_id,
+                callback_url,
+                "completed",
+                {"result_path": output_path, "metadata": metadata},
+            )
+
+        # Clean up downloaded video
+        if video_url.startswith(("http://", "https://")):
+            try:
+                os.remove(video_path)
+                logger.info(f"Cleaned up temporary video file: {video_path}")
+            except Exception as e:
+                logger.warning(f"Failed to clean up temporary video file: {str(e)}")
+
+        return {
+            "job_id": job_id,
+            "external_id": external_id,
+            "video_url": video_url,
+            "threshold": threshold,
+            "callback_url": callback_url,
+            "status": "completed",
+            "result_path": output_path,
+            "start_time": start_time,
+            "end_time": end_time,
+            "metadata": metadata,
+        }
+
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Scenes job {job_id} failed: {error_msg}")
         logger.error(traceback.format_exc())
 
         # Send failure callback

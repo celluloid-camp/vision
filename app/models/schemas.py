@@ -84,12 +84,14 @@ class JobStatus:
         video_url: str,
         similarity_threshold: float,
         callback_url: str = None,
+        job_type: str = "analyse",
     ):
         self.job_id = job_id
         self.external_id = external_id
         self.video_url = video_url
         self.similarity_threshold = similarity_threshold
         self.callback_url = callback_url
+        self.job_type = job_type  # "analyse" or "scenes"
         self.status = "queued"  # queued, processing, completed, failed
         self.start_time: Optional[datetime] = None
         self.end_time: Optional[datetime] = None

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urlparse
 import os
 
@@ -39,6 +39,25 @@ class AnalysisRequest(BaseModel):
         raise ValueError("video_url must be a valid URL or an existing file path")
 
 
+class ScenesRequest(BaseModel):
+    external_id: str = Field(..., description="Project identifier")
+    video_url: str = Field(..., description="URL or path to video file")
+    threshold: float = Field(
+        30.0, ge=0, description="Scene detection threshold"
+    )
+    callback_url: Optional[str] = Field(
+        None, description="Callback URL for job completion notifications"
+    )
+
+    @field_validator("video_url")
+    @classmethod
+    def validate_video_url(cls, v):
+        result = urlparse(v)
+        if (result.scheme in ("http", "https") and result.netloc) or os.path.exists(v):
+            return v
+        raise ValueError("video_url must be a valid URL or an existing file path")
+
+
 class AnalysisResponse(BaseModel):
     job_id: str
     status: str
@@ -51,6 +70,7 @@ class JobStatusResponse(BaseModel):
     job_id: str
     external_id: str
     status: str
+    job_type: str = "analyse"
     progress: float
     queue_position: int = 0
     estimated_wait_time: str = "00:00:00"
@@ -127,5 +147,6 @@ class DetectionResultsModel(BaseModel):
 
 class JobResultsResponse(BaseModel):
     status: str
-    data: Optional[DetectionResultsModel] = None
+    job_type: str = "analyse"
+    data: Optional[Any] = None
     error_message: Optional[str] = None
