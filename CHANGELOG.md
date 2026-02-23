@@ -3,6 +3,12 @@
 This changelog is auto generated using release-it.
 
 
+## [1.5.0](https://github.com/celluloid-camp/vision/compare/v1.4.2...v1.5.0) (2026-02-23)
+
+### Features
+
+* Add Redis visibility timeout and configurable log level for Celery workers ([93f5f08](https://github.com/celluloid-camp/vision/commit/93f5f087f13db500d894e0c990be228587cb9e85))
+
 ## [1.4.2](https://github.com/celluloid-camp/vision/compare/v1.4.1...v1.4.2) (2026-02-23)
 
 ### Code Refactoring
