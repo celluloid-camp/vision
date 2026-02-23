@@ -1,22 +1,16 @@
-"""Celery-based job manager (replaces RQ-based job manager)"""
+"""Celery-based job manager"""
 
 import json
 import logging
-import os
 from datetime import datetime
 from typing import List, Optional
 
-import redis
 from celery.result import AsyncResult
 
 from app.core.celery_app import CELERY_QUEUE_NAME, celery_app
 from app.models.schemas import JobStatus
 
 logger = logging.getLogger(__name__)
-
-REDIS_URL = os.getenv("REDIS_URL")
-if not REDIS_URL:
-    raise ValueError("REDIS_URL environment variable is required but not set")
 
 JOB_KEY_PREFIX = "celluloid:job:"
 JOB_REGISTRY_KEY = "celluloid:jobs"
@@ -26,15 +20,20 @@ ESTIMATED_MINUTES_PER_JOB = 5
 
 
 class CeleryJobManager:
-    def __init__(self, redis_url: str = REDIS_URL, queue_name: str = CELERY_QUEUE_NAME):
+    def __init__(self, queue_name: str = CELERY_QUEUE_NAME):
         """Initialize Celery job manager"""
-        self.redis_url = redis_url
         self.queue_name = queue_name
 
-        # Redis connection for job metadata storage
-        self.redis_conn = redis.from_url(redis_url)
-
         logger.info(f"Initialized Celery job manager with queue: {queue_name}")
+
+    @property
+    def _client(self):
+        """Redis client provided by the Celery backend (no separate connection)"""
+        return celery_app.backend.client
+
+    def ping(self) -> bool:
+        """Test connectivity to the Celery result backend (Redis)"""
+        return self._client.ping()
 
     def _job_key(self, job_id: str) -> str:
         return f"{JOB_KEY_PREFIX}{job_id}"
@@ -55,12 +54,12 @@ class CeleryJobManager:
             "start_time": job.start_time.isoformat() if job.start_time else None,
             "end_time": job.end_time.isoformat() if job.end_time else None,
         }
-        self.redis_conn.setex(self._job_key(job.job_id), 86400, json.dumps(data))
-        self.redis_conn.sadd(JOB_REGISTRY_KEY, job.job_id)
+        self._client.setex(self._job_key(job.job_id), 86400, json.dumps(data))
+        self._client.sadd(JOB_REGISTRY_KEY, job.job_id)
 
     def _load_job_meta(self, job_id: str) -> Optional[dict]:
         """Load job metadata from Redis"""
-        raw = self.redis_conn.get(self._job_key(job_id))
+        raw = self._client.get(self._job_key(job_id))
         if raw:
             return json.loads(raw)
         return None
@@ -100,7 +99,7 @@ class CeleryJobManager:
                         meta["progress"] = live_progress
                         if task_info.get("start_time") and not meta.get("start_time"):
                             meta["start_time"] = task_info["start_time"]
-                        self.redis_conn.setex(
+                        self._client.setex(
                             self._job_key(job_id), 86400, json.dumps(meta)
                         )
             elif celery_state == "SUCCESS":
@@ -122,18 +121,14 @@ class CeleryJobManager:
                             "end_time": task_result.get("end_time"),
                         }
                     )
-                    self.redis_conn.setex(
-                        self._job_key(job_id), 86400, json.dumps(meta)
-                    )
+                    self._client.setex(self._job_key(job_id), 86400, json.dumps(meta))
             elif celery_state == "FAILURE":
                 job.status = "failed"
                 exc = result.result
                 if exc and not meta.get("error_message"):
                     job.error_message = str(exc)
                     meta["error_message"] = job.error_message
-                    self.redis_conn.setex(
-                        self._job_key(job_id), 86400, json.dumps(meta)
-                    )
+                    self._client.setex(self._job_key(job_id), 86400, json.dumps(meta))
             elif celery_state == "REVOKED":
                 job.status = "failed"
             else:
@@ -165,7 +160,7 @@ class CeleryJobManager:
         """Get all tracked jobs from the job registry"""
         jobs = []
         try:
-            job_ids = self.redis_conn.smembers(JOB_REGISTRY_KEY)
+            job_ids = self._client.smembers(JOB_REGISTRY_KEY)
             for job_id_bytes in job_ids:
                 job_id = (
                     job_id_bytes.decode("utf-8")
@@ -183,7 +178,7 @@ class CeleryJobManager:
         """Remove job registry entries whose metadata has expired"""
         try:
             logger.info("Cleaning up stale job references...")
-            job_ids = self.redis_conn.smembers(JOB_REGISTRY_KEY)
+            job_ids = self._client.smembers(JOB_REGISTRY_KEY)
             for job_id_bytes in job_ids:
                 job_id = (
                     job_id_bytes.decode("utf-8")
@@ -191,7 +186,7 @@ class CeleryJobManager:
                     else job_id_bytes
                 )
                 if not self._load_job_meta(job_id):
-                    self.redis_conn.srem(JOB_REGISTRY_KEY, job_id)
+                    self._client.srem(JOB_REGISTRY_KEY, job_id)
                     logger.info(f"Removed stale job {job_id} from registry")
             logger.info("Stale job cleanup completed")
         except Exception as e:
@@ -258,8 +253,8 @@ class CeleryJobManager:
         try:
             result = AsyncResult(job_id, app=celery_app)
             result.forget()
-            self.redis_conn.delete(self._job_key(job_id))
-            self.redis_conn.srem(JOB_REGISTRY_KEY, job_id)
+            self._client.delete(self._job_key(job_id))
+            self._client.srem(JOB_REGISTRY_KEY, job_id)
             logger.info(f"Deleted job {job_id}")
         except Exception as e:
             logger.warning(f"Could not delete job {job_id}: {str(e)}")
@@ -277,24 +272,24 @@ class CeleryJobManager:
         """Get list of queued jobs with metadata, ordered by broker queue position."""
         queued_jobs = []
         try:
-            # Read the actual Celery broker queue (Redis list) to get true order.
-            # Each entry is a JSON-encoded Celery message; we only need the task id.
+            # Use the Celery inspect API to determine the order of reserved
+            # (pre-fetched) tasks.  `reserved()` returns tasks that workers have
+            # pulled from the broker but not yet started – this is the closest
+            # Celery-API equivalent to reading the raw broker queue, and avoids
+            # direct Redis access.  Tasks still sitting in the broker (not yet
+            # claimed by a worker) are not returned here; they fall through to
+            # the start_time-based sort below.
             broker_order: list[str] = []
             try:
-                raw_messages = self.redis_conn.lrange(self.queue_name, 0, -1)
-                for raw in raw_messages:
-                    try:
-                        msg = json.loads(raw)
-                        # Kombu message: {"headers": {"id": "<task_id>"}, ...}
-                        task_id = msg.get("headers", {}).get("id") or msg.get(
-                            "properties", {}
-                        ).get("correlation_id")
-                        if task_id:
-                            broker_order.append(task_id)
-                    except Exception:
-                        pass
+                inspector = celery_app.control.inspect(timeout=1.0)
+                reserved = inspector.reserved() or {}
+                broker_order = [
+                    task["id"] for tasks in reserved.values() for task in tasks
+                ]
             except Exception as e:
-                logger.warning(f"Could not read broker queue order: {e}")
+                logger.warning(
+                    f"Could not read broker queue order via Celery inspect: {e}"
+                )
 
             # Fall back to all queued jobs sorted by start_time
             jobs = self.get_all_jobs()

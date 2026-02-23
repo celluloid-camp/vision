@@ -40,7 +40,7 @@ async def health_check():
     """Health check endpoint"""
     try:
         # Test Redis connection
-        job_manager.redis_conn.ping()
+        job_manager.ping()
 
         # Count jobs by status
         all_jobs = job_manager.get_all_jobs()
