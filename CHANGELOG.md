@@ -3,6 +3,12 @@
 This changelog is auto generated using release-it.
 
 
+## [1.4.2](https://github.com/celluloid-camp/vision/compare/v1.4.1...v1.4.2) (2026-02-23)
+
+### Code Refactoring
+
+* CeleryJobManager uses Celery API, no separate Redis connection ([38f5a59](https://github.com/celluloid-camp/vision/commit/38f5a598ca301c691d1f9cdd4d54d5eb971d6303))
+
 ## [1.4.1](https://github.com/celluloid-camp/vision/compare/v1.4.0...v1.4.1) (2026-02-22)
 
 ### Chores
