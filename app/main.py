@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
 
     # Test Redis connection
     try:
-        job_manager.redis_conn.ping()
+        job_manager.ping()
         logger.info("Connected to Redis")
     except Exception as e:
         logger.error(f"Failed to connect to Redis: {str(e)}")
