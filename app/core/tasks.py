@@ -19,13 +19,14 @@ logger = logging.getLogger(__name__)
 
 
 def _send_callback_sync(
-    job_id, external_id, callback_url, status, results=None, error=None
+    job_id, external_id, callback_url, status, job_type="analyse", results=None, error=None
 ):
     """Send callback notification synchronously with retry logic"""
     callback_data = {
         "job_id": job_id,
         "external_id": external_id,
         "status": status,
+        "job_type": job_type,
         "timestamp": datetime.now().isoformat(),
     }
     if status == "completed" and results:
@@ -176,7 +177,8 @@ def process_video_task(self, job_data: dict):
                 external_id,
                 callback_url,
                 "completed",
-                {"result_path": output_path, "metadata": metadata},
+                job_type="analyse",
+                results={"result_path": output_path, "metadata": metadata},
             )
 
         # Clean up downloaded video
@@ -208,7 +210,7 @@ def process_video_task(self, job_data: dict):
         # Send failure callback
         if callback_url:
             _send_callback_sync(
-                job_id, external_id, callback_url, "failed", error=error_msg
+                job_id, external_id, callback_url, "failed", job_type="analyse", error=error_msg
             )
 
         raise
@@ -292,7 +294,8 @@ def process_scenes_task(self, job_data: dict):
                 external_id,
                 callback_url,
                 "completed",
-                {"result_path": output_path, "metadata": metadata},
+                job_type="scenes",
+                results={"result_path": output_path, "metadata": metadata},
             )
 
         # Clean up downloaded video
@@ -324,7 +327,7 @@ def process_scenes_task(self, job_data: dict):
         # Send failure callback
         if callback_url:
             _send_callback_sync(
-                job_id, external_id, callback_url, "failed", error=error_msg
+                job_id, external_id, callback_url, "failed", job_type="scenes", error=error_msg
             )
 
         raise
