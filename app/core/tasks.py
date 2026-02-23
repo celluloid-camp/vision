@@ -32,7 +32,7 @@ def _send_callback_sync(
     elif status == "failed" and error:
         callback_data["error"] = error
 
-    max_retries = 10
+    max_retries = 3
     retry_delay = 30
 
     for attempt in range(max_retries):

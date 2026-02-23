@@ -38,6 +38,7 @@ def api_command() -> list[str]:
 
 
 def worker_command() -> list[str]:
+    log_level = os.getenv("LOG_LEVEL", "info").lower()
     queue = os.getenv("CELERY_QUEUE_NAME", "celluloid_video_processing")
     return [
         sys.executable,
@@ -46,7 +47,8 @@ def worker_command() -> list[str]:
         "-A",
         "app.core.celery_app",
         "worker",
-        "--loglevel=info",
+        "--loglevel",
+        log_level,
         f"--queues={queue}",
         "--concurrency=1",
     ]

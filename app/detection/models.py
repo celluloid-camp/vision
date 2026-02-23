@@ -10,18 +10,18 @@ def get_model_path(model_type: str = "detector") -> str:
     """
     Get the path to the model file, downloading it if necessary.
     """
-    if model_type == "detector":
-        model_url = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite2/float32/latest/efficientdet_lite2.tflite"
-        model_name = "efficientdet_lite2.tflite"
-    elif model_type == "embedder":
-        model_url = "https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_large/float32/latest/mobilenet_v3_large.tflite"
-        model_name = "mobilenet_v3_large.tflite"
     # if model_type == "detector":
-    #     model_url = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float32/latest/efficientdet_lite0.tflite"
-    #     model_name = "efficientdet_lite0.tflite"
+    #     model_url = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite2/float32/latest/efficientdet_lite2.tflite"
+    #     model_name = "efficientdet_lite2.tflite"
     # elif model_type == "embedder":
-    #     model_url = "https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_small/float32/latest/mobilenet_v3_small.tflite"
-    #     model_name = "mobilenet_v3_small.tflite"
+    #     model_url = "https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_large/float32/latest/mobilenet_v3_large.tflite"
+    #     model_name = "mobilenet_v3_large.tflite"
+    if model_type == "detector":
+        model_url = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float32/latest/efficientdet_lite0.tflite"
+        model_name = "efficientdet_lite0.tflite"
+    elif model_type == "embedder":
+        model_url = "https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_small/float32/latest/mobilenet_v3_small.tflite"
+        model_name = "mobilenet_v3_small.tflite"
 
     elif model_type == "face":
         model_url = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite"

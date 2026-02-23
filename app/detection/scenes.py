@@ -77,7 +77,7 @@ def detect_scenes_from_file(
 
 # Example usage
 if __name__ == "__main__":
-    video_url = "https://video.mshparisnord.fr/static/streaming-playlists/hls/eff0a3a5-5b2a-4e7b-b6e7-177198779081/8e8d5317-431c-4661-90d7-a6f62f1b6641-720-fragmented.mp4"
+    video_url = "https://pt-storage.celluloid.cloud/web-videos/a53d2ce5-0db1-49bf-9daa-be2dafd46ee9-144.mp4"
 
     # Create tmp folder
     tmp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tmp")
@@ -98,7 +98,7 @@ if __name__ == "__main__":
     download_file(video_url, video_path)
 
     # Detect scenes and save to JSON
-    results = detect_scenes_from_file(video_path, threshold=30.0, save_json=True)
+    results = detect_scenes_from_file(video_path, threshold=30.0)
 
     output_filename = f"scene_detection_{timestamp}.json"
     tmp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tmp")
