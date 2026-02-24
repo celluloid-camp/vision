@@ -84,9 +84,29 @@ class CeleryJobManager:
             celery_state = result.state
 
             if celery_state == "PENDING":
-                job.status = "queued"
+                # PENDING is Celery's default for both "not yet started" and
+                # "unknown task".  If our metadata already shows the job was
+                # actively processing, the worker was restarted (or crashed)
+                # while running the task.  Treat that as a failure so the
+                # caller can re-submit the job instead of waiting forever.
+                if meta.get("status") == "processing":
+                    job.status = "failed"
+                    if not meta.get("error_message"):
+                        job.error_message = "Job interrupted: worker was restarted or crashed during processing"
+                        meta["error_message"] = job.error_message
+                    meta["status"] = "failed"
+                    meta["end_time"] = (
+                        meta.get("end_time") or datetime.now().isoformat()
+                    )
+                    self._client.setex(self._job_key(job_id), 86400, json.dumps(meta))
+                else:
+                    job.status = "queued"
             elif celery_state in ("STARTED", "PROCESSING"):
                 job.status = "processing"
+                # Persist the "processing" status so that if the worker dies
+                # and the Celery state reverts to PENDING, we can detect the
+                # stuck condition on the next call.
+                needs_update = meta.get("status") != "processing"
                 # Read live progress from Celery task state metadata and
                 # write it back into our Redis meta key so callers don't
                 # need to hit the Celery backend on every subsequent poll.
@@ -97,11 +117,13 @@ class CeleryJobManager:
                     )
                     if live_progress != float(meta.get("progress", 0.0)):
                         meta["progress"] = live_progress
-                        if task_info.get("start_time") and not meta.get("start_time"):
-                            meta["start_time"] = task_info["start_time"]
-                        self._client.setex(
-                            self._job_key(job_id), 86400, json.dumps(meta)
-                        )
+                        needs_update = True
+                    if task_info.get("start_time") and not meta.get("start_time"):
+                        meta["start_time"] = task_info["start_time"]
+                        needs_update = True
+                if needs_update:
+                    meta["status"] = "processing"
+                    self._client.setex(self._job_key(job_id), 86400, json.dumps(meta))
             elif celery_state == "SUCCESS":
                 job.status = "completed"
                 # Pull result_path and metadata from the task return value and
