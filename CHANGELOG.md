@@ -3,6 +3,8 @@
 This changelog is auto generated using release-it.
 
 
+## [1.5.1](https://github.com/celluloid-camp/vision/compare/v1.5.0...v1.5.1) (2026-02-24)
+
 ## [1.5.0](https://github.com/celluloid-camp/vision/compare/v1.4.2...v1.5.0) (2026-02-23)
 
 ### Features
