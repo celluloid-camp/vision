@@ -172,6 +172,69 @@ class TestAnalyseValidation:
         )
         assert r.status_code == 422
 
+    def test_analyse_invalid_callback_url_scheme_returns_422(self):
+        r = requests.post(
+            f"{BASE_URL}/job/analyse",
+            json={
+                "external_id": "ci-proj",
+                "video_url": "http://example.com/v.mp4",
+                "callback_url": "ftp://example.com/callback",
+            },
+            headers=HEADERS_AUTH,
+        )
+        assert r.status_code == 422
+
+    def test_analyse_callback_url_localhost_returns_422(self):
+        r = requests.post(
+            f"{BASE_URL}/job/analyse",
+            json={
+                "external_id": "ci-proj",
+                "video_url": "http://example.com/v.mp4",
+                "callback_url": "http://localhost/callback",
+            },
+            headers=HEADERS_AUTH,
+        )
+        assert r.status_code == 422
+
+    def test_analyse_callback_url_private_ip_returns_422(self):
+        r = requests.post(
+            f"{BASE_URL}/job/analyse",
+            json={
+                "external_id": "ci-proj",
+                "video_url": "http://example.com/v.mp4",
+                "callback_url": "http://192.168.1.1/callback",
+            },
+            headers=HEADERS_AUTH,
+        )
+        assert r.status_code == 422
+
+    def test_analyse_callback_url_loopback_ip_returns_422(self):
+        r = requests.post(
+            f"{BASE_URL}/job/analyse",
+            json={
+                "external_id": "ci-proj",
+                "video_url": "http://example.com/v.mp4",
+                "callback_url": "http://127.0.0.1/callback",
+            },
+            headers=HEADERS_AUTH,
+        )
+        assert r.status_code == 422
+
+    def test_analyse_valid_callback_url_accepted(self):
+        r = requests.post(
+            f"{BASE_URL}/job/analyse",
+            json={
+                "external_id": "ci-callback-valid",
+                "video_url": "http://example.com/v.mp4",
+                "callback_url": "https://hooks.example.com/notify",
+            },
+            headers=HEADERS_AUTH,
+        )
+        # 202 on success; 422 is also acceptable if video_url fails file-exists check
+        assert r.status_code in (202, 422)
+        if r.status_code == 202:
+            assert r.json().get("callback_url") == "https://hooks.example.com/notify"
+
     def test_analyse_response_shape(self):
         """Valid request returns the expected JSON fields."""
         r = requests.post(

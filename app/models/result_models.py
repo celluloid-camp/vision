@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field, field_validator
+import ipaddress
+import os
 from typing import Optional
 from urllib.parse import urlparse
-import os
+
+from pydantic import BaseModel, Field, field_validator
 
 
 class JobStats(BaseModel):
@@ -37,6 +39,32 @@ class AnalysisRequest(BaseModel):
         if (result.scheme in ("http", "https") and result.netloc) or os.path.exists(v):
             return v
         raise ValueError("video_url must be a valid URL or an existing file path")
+
+    @field_validator("callback_url")
+    @classmethod
+    def validate_callback_url(cls, v):
+        if v is None:
+            return v
+        result = urlparse(v)
+        if result.scheme not in ("http", "https"):
+            raise ValueError("callback_url must use http or https scheme")
+        if not result.netloc:
+            raise ValueError("callback_url must have a valid host")
+        hostname = result.hostname
+        if hostname is None:
+            raise ValueError("callback_url must have a valid host")
+        if hostname.lower() == "localhost":
+            raise ValueError("callback_url must not point to a private or loopback address")
+        # Note: domain names that resolve to private IPs are not blocked here.
+        # Only literal IP addresses are checked to avoid DNS-based bypasses via latency.
+        try:
+            addr = ipaddress.ip_address(hostname)
+        except ValueError:
+            pass
+        else:
+            if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_multicast or addr.is_reserved:
+                raise ValueError("callback_url must not point to a private or loopback address")
+        return v
 
 
 class AnalysisResponse(BaseModel):
