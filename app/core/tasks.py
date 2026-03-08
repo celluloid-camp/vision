@@ -12,7 +12,7 @@ import requests
 
 from app.core.celery_app import celery_app
 from app.core.utils import download_video
-from app.detection.detect_objects import ObjectDetector
+from app.detection.object_detect import ObjectDetector
 
 logger = logging.getLogger(__name__)
 

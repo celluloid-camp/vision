@@ -56,6 +56,8 @@ def worker_command() -> list[str]:
 
 def flower_command() -> list[str]:
     flower_port = os.getenv("FLOWER_PORT", "5555")
+    flower_db = os.getenv("FLOWER_DB", "/app/flower/flower.db")
+    flower_persistent = os.getenv("FLOWER_PERSISTENT", "true").lower()
     return [
         sys.executable,
         "-m",
@@ -64,6 +66,8 @@ def flower_command() -> list[str]:
         "app.core.celery_app",
         "flower",
         f"--port={flower_port}",
+        f"--persistent={flower_persistent}",
+        f"--db={flower_db}",
     ]
 
 
@@ -143,7 +147,7 @@ def main() -> int:
     if mode == "default":
         return run_multi(["api", "worker"])
 
-    return run_multi(["api", "worker", "flower"])
+    return run_multi(["worker", "flower", "api"])
 
 
 if __name__ == "__main__":

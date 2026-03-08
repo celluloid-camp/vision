@@ -186,3 +186,6 @@ outputs/
 include
 
 app/detection/models/*.tflite
+
+tmp/
+flower

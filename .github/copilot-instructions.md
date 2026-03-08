@@ -71,8 +71,8 @@ The project uses a flat structure with all Python modules in the root directory:
 **Core Application Files:**
 - `app.py`: FastAPI application with API endpoints
 - `run.py`: Unified entry point script for API, worker, and Flower
-- `detect_objects.py`: Core object detection logic using MediaPipe
-- `scenes.py`: Scene detection functionality using scenedetect
+- `object_detect.py`: Core object detection logic using MediaPipe
+- `scene_detect.py`: Scene detection functionality using scenedetect
 - `rq_queue.py`: RQ job manager for async processing
 
 **Data Models:**
@@ -113,7 +113,7 @@ The project uses a flat structure with all Python modules in the root directory:
 - CORS middleware enabled
 - Scalar API documentation at `/scalar`
 
-#### 2. Detection Engine (detect_objects.py)
+#### 2. Detection Engine (object_detect.py)
 - MediaPipe-based object detection
 - Person detection with face detection
 - Object tracking across frames
@@ -221,7 +221,7 @@ uv run python test_web_service.py
    - Update API documentation
 
 2. **Detection Logic**
-   - Add new detection functions to `detect_objects.py`
+   - Add new detection functions to `object_detect.py`
    - Follow existing pattern: process video → extract features → return structured data
    - Include progress reporting for long-running operations
    - Handle video download and cleanup
@@ -266,7 +266,7 @@ uv run python test_web_service.py
 ## Common Tasks
 
 ### Adding a New Detection Feature
-1. Add detection logic to `detect_objects.py`
+1. Add detection logic to `object_detect.py`
 2. Define data model in `detection_schemas.py`
 3. Update API response model in `result_models.py`
 4. Add endpoint or extend existing in `app.py`
@@ -280,7 +280,7 @@ uv run python test_web_service.py
 5. Test endpoint functionality
 
 ### Modifying Detection Parameters
-1. Update function signatures in `detect_objects.py`
+1. Update function signatures in `object_detect.py`
 2. Update `AnalysisRequest` model in `result_models.py`
 3. Update API documentation in `Api.md`
 4. Update or add tests in `test_web_service.py` to validate new parameters

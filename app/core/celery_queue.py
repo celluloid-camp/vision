@@ -1,6 +1,6 @@
-"""Celery-based job manager"""
+"""Celery-based job manager relying on Celery APIs only."""
 
-import json
+import ast
 import logging
 from datetime import datetime
 from typing import List, Optional
@@ -12,221 +12,162 @@ from app.models.schemas import JobStatus
 
 logger = logging.getLogger(__name__)
 
-JOB_KEY_PREFIX = "celluloid:job:"
-JOB_REGISTRY_KEY = "celluloid:jobs"
-
-
 ESTIMATED_MINUTES_PER_JOB = 5
 
 
 class CeleryJobManager:
     def __init__(self, queue_name: str = CELERY_QUEUE_NAME):
-        """Initialize Celery job manager"""
+        """Initialize Celery job manager."""
         self.queue_name = queue_name
-
-        logger.info(f"Initialized Celery job manager with queue: {queue_name}")
-
-    @property
-    def _client(self):
-        """Redis client provided by the Celery backend (no separate connection)"""
-        return celery_app.backend.client
+        logger.info("Initialized Celery job manager with queue: %s", queue_name)
 
     def ping(self) -> bool:
-        """Test connectivity to the Celery result backend (Redis)"""
-        return self._client.ping()
+        """Test connectivity through Celery control API."""
+        try:
+            response = celery_app.control.ping(timeout=1.0)
+            return bool(response)
+        except Exception:
+            return False
 
-    def _job_key(self, job_id: str) -> str:
-        return f"{JOB_KEY_PREFIX}{job_id}"
+    def _extract_job_data(self, task: dict) -> dict:
+        """Extract first positional arg dict from Celery inspect task payload."""
+        args = task.get("args")
+        if isinstance(args, (list, tuple)) and args and isinstance(args[0], dict):
+            return args[0]
+        if isinstance(args, str) and args:
+            try:
+                parsed = ast.literal_eval(args)
+                if (
+                    isinstance(parsed, (list, tuple))
+                    and parsed
+                    and isinstance(parsed[0], dict)
+                ):
+                    return parsed[0]
+            except Exception:
+                return {}
+        return {}
 
-    def _save_job_meta(self, job: JobStatus):
-        """Persist job metadata in Redis"""
-        data = {
-            "job_id": job.job_id,
-            "external_id": job.external_id,
-            "video_url": job.video_url,
-            "similarity_threshold": float(job.similarity_threshold),
-            "callback_url": job.callback_url,
-            "status": job.status,
-            "progress": float(job.progress),
-            "result_path": job.result_path,
-            "error_message": job.error_message,
-            "metadata": job.metadata,
-            "start_time": job.start_time.isoformat() if job.start_time else None,
-            "end_time": job.end_time.isoformat() if job.end_time else None,
-        }
-        self._client.setex(self._job_key(job.job_id), 86400, json.dumps(data))
-        self._client.sadd(JOB_REGISTRY_KEY, job.job_id)
+    def _job_from_payload(
+        self, job_id: str, payload: dict, status: str, progress: float = 0.0
+    ) -> JobStatus:
+        job = JobStatus(
+            job_id=job_id,
+            external_id=payload.get("external_id", "unknown"),
+            video_url=payload.get("video_url", "unknown"),
+            similarity_threshold=float(payload.get("similarity_threshold", 0.0)),
+            callback_url=payload.get("callback_url"),
+        )
+        job.status = status
+        job.progress = progress
+        return job
 
-    def _load_job_meta(self, job_id: str) -> Optional[dict]:
-        """Load job metadata from Redis"""
-        raw = self._client.get(self._job_key(job_id))
-        if raw:
-            return json.loads(raw)
-        return None
+    def _inspect_tasks(self) -> tuple[list[dict], list[dict], list[dict]]:
+        """Return (active, reserved, scheduled) task lists from Celery inspect."""
+        inspector = celery_app.control.inspect(timeout=1.0)
+        active = [t for tasks in (inspector.active() or {}).values() for t in tasks]
+        reserved = [t for tasks in (inspector.reserved() or {}).values() for t in tasks]
+        scheduled = [
+            t for tasks in (inspector.scheduled() or {}).values() for t in tasks
+        ]
+        return active, reserved, scheduled
 
     def get_job_from_celery(self, job_id: str) -> Optional[JobStatus]:
-        """Get job status from Celery task state and Redis metadata"""
+        """Get job status from Celery task state and inspect output."""
         try:
-            meta = self._load_job_meta(job_id)
-            if not meta:
-                return None
-
-            job = JobStatus(
-                job_id=job_id,
-                external_id=meta.get("external_id", "unknown"),
-                video_url=meta.get("video_url", "unknown"),
-                similarity_threshold=float(meta.get("similarity_threshold", 0.0)),
-                callback_url=meta.get("callback_url"),
-            )
-
-            # Determine status from Celery task state
             result = AsyncResult(job_id, app=celery_app)
             celery_state = result.state
 
-            if celery_state == "PENDING":
-                # PENDING is Celery's default for both "not yet started" and
-                # "unknown task".  If our metadata already shows the job was
-                # actively processing, the worker was restarted (or crashed)
-                # while running the task.  Treat that as a failure so the
-                # caller can re-submit the job instead of waiting forever.
-                if meta.get("status") == "processing":
-                    job.status = "failed"
-                    if not meta.get("error_message"):
-                        job.error_message = "Job interrupted: worker was restarted or crashed during processing"
-                        meta["error_message"] = job.error_message
-                    meta["status"] = "failed"
-                    meta["end_time"] = (
-                        meta.get("end_time") or datetime.now().isoformat()
-                    )
-                    self._client.setex(self._job_key(job_id), 86400, json.dumps(meta))
-                else:
-                    job.status = "queued"
-            elif celery_state in ("STARTED", "PROCESSING"):
-                job.status = "processing"
-                # Persist the "processing" status so that if the worker dies
-                # and the Celery state reverts to PENDING, we can detect the
-                # stuck condition on the next call.
-                needs_update = meta.get("status") != "processing"
-                # Read live progress from Celery task state metadata and
-                # write it back into our Redis meta key so callers don't
-                # need to hit the Celery backend on every subsequent poll.
-                task_info = result.info
-                if task_info and isinstance(task_info, dict):
-                    live_progress = float(
-                        task_info.get("progress", meta.get("progress", 0.0))
-                    )
-                    if live_progress != float(meta.get("progress", 0.0)):
-                        meta["progress"] = live_progress
-                        needs_update = True
-                    if task_info.get("start_time") and not meta.get("start_time"):
-                        meta["start_time"] = task_info["start_time"]
-                        needs_update = True
-                if needs_update:
-                    meta["status"] = "processing"
-                    self._client.setex(self._job_key(job_id), 86400, json.dumps(meta))
-            elif celery_state == "SUCCESS":
-                job.status = "completed"
-                # Pull result_path and metadata from the task return value and
-                # write them back into the Redis metadata so future calls do not
-                # need to re-query the Celery result backend.
-                task_result = result.result
-                if task_result and isinstance(task_result, dict):
-                    job.result_path = task_result.get("result_path")
-                    job.metadata = task_result.get("metadata", {})
-                    if task_result.get("end_time"):
-                        job.end_time = datetime.fromisoformat(task_result["end_time"])
-                    meta.update(
-                        {
-                            "status": "completed",
-                            "result_path": job.result_path,
-                            "metadata": job.metadata,
-                            "end_time": task_result.get("end_time"),
-                        }
-                    )
-                    self._client.setex(self._job_key(job_id), 86400, json.dumps(meta))
-            elif celery_state == "FAILURE":
-                job.status = "failed"
-                exc = result.result
-                if exc and not meta.get("error_message"):
-                    job.error_message = str(exc)
-                    meta["error_message"] = job.error_message
-                    self._client.setex(self._job_key(job_id), 86400, json.dumps(meta))
-            elif celery_state == "REVOKED":
-                job.status = "failed"
-            else:
-                job.status = meta.get("status", "queued")
+            if celery_state in ("STARTED", "PROCESSING"):
+                task_info = result.info if isinstance(result.info, dict) else {}
+                job = self._job_from_payload(
+                    job_id=job_id,
+                    payload=task_info,
+                    status="processing",
+                    progress=float(task_info.get("progress", 0.0)),
+                )
+                if task_info.get("start_time"):
+                    job.start_time = datetime.fromisoformat(task_info["start_time"])
+                return job
 
-            job.progress = float(meta.get("progress", 0.0))
-            job.result_path = meta.get("result_path")
-            job.error_message = meta.get("error_message")
-            job.metadata = meta.get("metadata", {})
+            if celery_state == "SUCCESS":
+                task_result = result.result if isinstance(result.result, dict) else {}
+                job = self._job_from_payload(
+                    job_id=job_id, payload=task_result, status="completed", progress=100.0
+                )
+                job.result_path = task_result.get("result_path")
+                job.metadata = task_result.get("metadata", {})
+                if task_result.get("start_time"):
+                    job.start_time = datetime.fromisoformat(task_result["start_time"])
+                if task_result.get("end_time"):
+                    job.end_time = datetime.fromisoformat(task_result["end_time"])
+                return job
 
-            if meta.get("start_time"):
-                job.start_time = datetime.fromisoformat(meta["start_time"])
-            if meta.get("end_time"):
-                job.end_time = datetime.fromisoformat(meta["end_time"])
+            if celery_state == "FAILURE":
+                info = result.info if isinstance(result.info, dict) else {}
+                job = self._job_from_payload(
+                    job_id=job_id, payload=info, status="failed", progress=0.0
+                )
+                job.error_message = str(result.result) if result.result else None
+                return job
 
-            return job
+            if celery_state == "REVOKED":
+                job = self._job_from_payload(
+                    job_id=job_id, payload={}, status="failed", progress=0.0
+                )
+                job.error_message = "Task revoked"
+                return job
+
+            # PENDING can mean queued or unknown; inspect queue/worker tasks to decide.
+            active, reserved, scheduled = self._inspect_tasks()
+            for task in active:
+                if task.get("id") == job_id:
+                    payload = self._extract_job_data(task)
+                    return self._job_from_payload(job_id, payload, "processing")
+            for task in reserved + scheduled:
+                if task.get("id") == job_id:
+                    payload = self._extract_job_data(task)
+                    return self._job_from_payload(job_id, payload, "queued")
+
+            return None
         except Exception as e:
-            logger.error(f"Error getting job {job_id} from Celery: {str(e)}")
+            logger.error("Error getting job %s from Celery: %s", job_id, str(e))
             return None
 
     def save_job_to_celery(self, job: JobStatus):
-        """Save job status to Redis metadata"""
-        try:
-            self._save_job_meta(job)
-        except Exception as e:
-            logger.error(f"Error saving job {job.job_id} to Celery: {str(e)}")
+        """Compatibility no-op (Celery is source of truth)."""
+        logger.debug("save_job_to_celery no-op for job %s", job.job_id)
 
     def get_all_jobs(self) -> List[JobStatus]:
-        """Get all tracked jobs from the job registry"""
-        jobs = []
+        """Get all visible queued/processing jobs from Celery inspect APIs."""
+        jobs: list[JobStatus] = []
         try:
-            job_ids = self._client.smembers(JOB_REGISTRY_KEY)
-            for job_id_bytes in job_ids:
-                job_id = (
-                    job_id_bytes.decode("utf-8")
-                    if isinstance(job_id_bytes, bytes)
-                    else job_id_bytes
-                )
-                job = self.get_job_from_celery(job_id)
-                if job:
-                    jobs.append(job)
+            active, reserved, scheduled = self._inspect_tasks()
+
+            for task in active:
+                payload = self._extract_job_data(task)
+                job_id = task.get("id")
+                if job_id:
+                    jobs.append(self._job_from_payload(job_id, payload, "processing"))
+
+            for task in reserved + scheduled:
+                payload = self._extract_job_data(task)
+                job_id = task.get("id")
+                if job_id:
+                    jobs.append(self._job_from_payload(job_id, payload, "queued"))
         except Exception as e:
-            logger.error(f"Error getting all jobs: {str(e)}")
+            logger.error("Error getting all jobs: %s", str(e))
         return jobs
 
     def cleanup_stale_jobs(self):
-        """Remove job registry entries whose metadata has expired"""
-        try:
-            logger.info("Cleaning up stale job references...")
-            job_ids = self._client.smembers(JOB_REGISTRY_KEY)
-            for job_id_bytes in job_ids:
-                job_id = (
-                    job_id_bytes.decode("utf-8")
-                    if isinstance(job_id_bytes, bytes)
-                    else job_id_bytes
-                )
-                if not self._load_job_meta(job_id):
-                    self._client.srem(JOB_REGISTRY_KEY, job_id)
-                    logger.info(f"Removed stale job {job_id} from registry")
-            logger.info("Stale job cleanup completed")
-        except Exception as e:
-            logger.error(f"Error cleaning up stale jobs: {str(e)}")
+        """Compatibility no-op (no Redis job registry)."""
+        logger.info("No stale job cleanup required (Celery-only mode).")
 
     def get_queue_status_info(self):
-        """Get current queue status from Celery"""
+        """Get current queue status from Celery inspect APIs."""
         try:
-            inspector = celery_app.control.inspect(timeout=1.0)
-            active = inspector.active() or {}
-            reserved = inspector.reserved() or {}
-
-            active_tasks = [t for tasks in active.values() for t in tasks]
-            queued_tasks = [t for tasks in reserved.values() for t in tasks]
-
-            current_job_id = active_tasks[0]["id"] if active_tasks else None
-            queue_length = len(queued_tasks)
-
+            active, reserved, scheduled = self._inspect_tasks()
+            current_job_id = active[0]["id"] if active else None
+            queue_length = len(reserved) + len(scheduled)
             return {
                 "queue_length": queue_length,
                 "current_job": current_job_id,
@@ -234,7 +175,7 @@ class CeleryJobManager:
                 "finished_count": 0,
             }
         except Exception as e:
-            logger.error(f"Error getting queue status: {str(e)}")
+            logger.error("Error getting queue status: %s", str(e))
             return {
                 "queue_length": 0,
                 "current_job": None,
@@ -243,7 +184,7 @@ class CeleryJobManager:
             }
 
     def enqueue_job(self, job: JobStatus):
-        """Enqueue a job to the Celery queue"""
+        """Enqueue a job to the Celery queue."""
         try:
             from app.core.tasks import process_video_task
 
@@ -261,74 +202,36 @@ class CeleryJobManager:
                 queue=self.queue_name,
             )
 
-            # Persist job metadata so it can be queried before the task starts
-            self._save_job_meta(job)
-
-            logger.info(f"Enqueued job {job.job_id} to Celery queue {self.queue_name}")
+            logger.info("Enqueued job %s to Celery queue %s", job.job_id, self.queue_name)
             return result
         except Exception as e:
-            logger.error(f"Error enqueueing job {job.job_id}: {str(e)}")
+            logger.error("Error enqueueing job %s: %s", job.job_id, str(e))
             raise
 
     def delete_job(self, job_id: str):
-        """Delete a job from Celery and Redis"""
+        """Delete a job from Celery backend."""
         try:
             result = AsyncResult(job_id, app=celery_app)
             result.forget()
-            self._client.delete(self._job_key(job_id))
-            self._client.srem(JOB_REGISTRY_KEY, job_id)
-            logger.info(f"Deleted job {job_id}")
+            logger.info("Deleted job %s", job_id)
         except Exception as e:
-            logger.warning(f"Could not delete job {job_id}: {str(e)}")
+            logger.warning("Could not delete job %s: %s", job_id, str(e))
 
     def cancel_job(self, job_id: str):
-        """Cancel a queued or running job"""
+        """Cancel a queued or running job."""
         try:
             result = AsyncResult(job_id, app=celery_app)
             result.revoke(terminate=True)
-            logger.info(f"Cancelled job {job_id}")
+            logger.info("Cancelled job %s", job_id)
         except Exception as e:
-            logger.warning(f"Could not cancel job {job_id}: {str(e)}")
+            logger.warning("Could not cancel job %s: %s", job_id, str(e))
 
     def get_queued_jobs(self):
-        """Get list of queued jobs with metadata, ordered by broker queue position."""
+        """Get list of queued jobs with estimated wait time."""
         queued_jobs = []
         try:
-            # Use the Celery inspect API to determine the order of reserved
-            # (pre-fetched) tasks.  `reserved()` returns tasks that workers have
-            # pulled from the broker but not yet started – this is the closest
-            # Celery-API equivalent to reading the raw broker queue, and avoids
-            # direct Redis access.  Tasks still sitting in the broker (not yet
-            # claimed by a worker) are not returned here; they fall through to
-            # the start_time-based sort below.
-            broker_order: list[str] = []
-            try:
-                inspector = celery_app.control.inspect(timeout=1.0)
-                reserved = inspector.reserved() or {}
-                broker_order = [
-                    task["id"] for tasks in reserved.values() for task in tasks
-                ]
-            except Exception as e:
-                logger.warning(
-                    f"Could not read broker queue order via Celery inspect: {e}"
-                )
-
-            # Fall back to all queued jobs sorted by start_time
             jobs = self.get_all_jobs()
             queued = [j for j in jobs if j.status == "queued"]
-            if broker_order:
-                # Sort by position in the broker queue; jobs not in the broker
-                # list (pre-fetched by worker) go to the end sorted by start_time.
-                def _order(job):
-                    try:
-                        return broker_order.index(job.job_id)
-                    except ValueError:
-                        return len(broker_order)
-
-                queued.sort(key=_order)
-            else:
-                # No broker order available — sort by enqueue time
-                queued.sort(key=lambda j: j.start_time or datetime.min)
 
             for i, job in enumerate(queued):
                 wait_seconds = (i + 1) * ESTIMATED_MINUTES_PER_JOB * 60
@@ -344,13 +247,13 @@ class CeleryJobManager:
                     }
                 )
         except Exception as e:
-            logger.error(f"Error getting queued jobs: {str(e)}")
+            logger.error("Error getting queued jobs: %s", str(e))
         return queued_jobs
 
     def clean_queue(self):
-        """Purge all pending tasks from the Celery queue"""
+        """Purge all pending tasks from the Celery queue."""
         try:
             celery_app.control.purge()
             logger.info("Celery queue cleaned.")
         except Exception as e:
-            logger.error(f"Error cleaning Celery queue: {str(e)}")
+            logger.error("Error cleaning Celery queue: %s", str(e))

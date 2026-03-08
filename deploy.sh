@@ -23,11 +23,16 @@ docker run -d \
     -p 8081:8081 \
     -p 5555:5555 \
     -v "$(pwd)/outputs:/app/outputs" \
+    -v "$(pwd)/flower:/app/flower" \
     -v "$(pwd)/models:/app/models:ro" \
     -e REDIS_URL="redis://host.docker.internal:6379/0" \
     -e API_KEY="xxx" \
     -e CELERY_QUEUE_NAME="celluloid_video_processing" \
+    -e CELERY_VISIBILITY_TIMEOUT="60" \
     -e CELERY_TASK_TIMEOUT="3000" \
+    -e FLOWER_UNAUTHENTICATED_API="true" \
+    -e FLOWER_PERSISTENT="true" \
+    -e FLOWER_DB="/app/flower/flower.db" \
     celluloid-video-analysis-api
 
 # Wait for service to be ready
@@ -53,6 +58,7 @@ echo "🔍 Flower is available at: http://localhost:5555"
 echo ""
 echo "📋 Useful commands:"
 echo "   View logs:   docker logs -f celluloid-video-analysis-api"
+echo "   Purge queue: docker exec celluloid-video-analysis-api python -m celery -A app.core.celery_app purge -f"
 echo "   Stop:       docker stop celluloid-video-analysis-api"
 echo "   Restart:    docker restart celluloid-video-analysis-api"
 echo "   Remove:     docker rm -f celluloid-video-analysis-api" 

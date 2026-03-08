@@ -39,8 +39,9 @@ header_scheme = APIKeyHeader(name="x-api-key")
 async def health_check():
     """Health check endpoint"""
     try:
-        # Test Redis connection
-        job_manager.ping()
+        # Test Celery/control connection
+        if not job_manager.ping():
+            raise RuntimeError("Celery is not reachable")
 
         # Count jobs by status
         all_jobs = job_manager.get_all_jobs()
@@ -111,27 +112,6 @@ async def create_analysis_task(
                 "status": existing_job.status,
                 "queue_position": 1,
                 "message": f"Project {body.external_id} already has an active job",
-                "callback_url": existing_job.callback_url,
-            }
-
-        # Check for recently completed jobs (within last hour)
-        recent_completed = [
-            job
-            for job in existing_jobs
-            if job.status == "completed"
-            and job.end_time
-            and (datetime.now() - job.end_time).total_seconds() < 3600
-        ]
-        if recent_completed:
-            existing_job = recent_completed[0]
-            logger.info(
-                f"Returning recently completed job {existing_job.job_id} for project {body.external_id}"
-            )
-            return {
-                "job_id": existing_job.job_id,
-                "status": existing_job.status,
-                "queue_position": 0,
-                "message": f"Project {body.external_id} was recently completed",
                 "callback_url": existing_job.callback_url,
             }
 

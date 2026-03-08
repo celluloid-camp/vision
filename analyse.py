@@ -4,7 +4,7 @@ Command-line interface for video detection
 This is a wrapper script that calls the detection module from the app package.
 """
 import sys
-from app.detection.detect_objects import main
+from app.detection.object_detect import main
 
 if __name__ == "__main__":
     sys.exit(main())
