@@ -104,7 +104,11 @@ def detect_scenes_from_file(
         # Build SceneInfo with optional sprite_fragment
         scenes_data: List[SceneInfo] = []
         for i, (start_time, end_time) in enumerate(scenes):
-            fragment = sprite_fragments_out[i] if sprite_fragments_out and i < len(sprite_fragments_out) else None
+            fragment = (
+                sprite_fragments_out[i]
+                if sprite_fragments_out and i < len(sprite_fragments_out)
+                else None
+            )
             scene_info = SceneInfo(
                 scene_id=i,
                 start_time=str(start_time),

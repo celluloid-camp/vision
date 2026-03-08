@@ -92,7 +92,10 @@ class CeleryJobManager:
             if celery_state == "SUCCESS":
                 task_result = result.result if isinstance(result.result, dict) else {}
                 job = self._job_from_payload(
-                    job_id=job_id, payload=task_result, status="completed", progress=100.0
+                    job_id=job_id,
+                    payload=task_result,
+                    status="completed",
+                    progress=100.0,
                 )
                 job.result_path = task_result.get("result_path")
                 job.metadata = task_result.get("metadata", {})
@@ -202,7 +205,9 @@ class CeleryJobManager:
                 queue=self.queue_name,
             )
 
-            logger.info("Enqueued job %s to Celery queue %s", job.job_id, self.queue_name)
+            logger.info(
+                "Enqueued job %s to Celery queue %s", job.job_id, self.queue_name
+            )
             return result
         except Exception as e:
             logger.error("Error enqueueing job %s: %s", job.job_id, str(e))
