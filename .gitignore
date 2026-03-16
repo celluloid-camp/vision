@@ -189,3 +189,4 @@ app/detection/models/*.tflite
 
 tmp/
 flower
+.data/

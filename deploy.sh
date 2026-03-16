@@ -28,7 +28,6 @@ docker run -d \
     -e REDIS_URL="redis://host.docker.internal:6379/0" \
     -e API_KEY="xxx" \
     -e CELERY_QUEUE_NAME="celluloid_video_processing" \
-    -e CELERY_VISIBILITY_TIMEOUT="60" \
     -e CELERY_TASK_TIMEOUT="3000" \
     -e FLOWER_UNAUTHENTICATED_API="true" \
     -e FLOWER_PERSISTENT="true" \
