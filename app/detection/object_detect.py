@@ -243,11 +243,14 @@ class ObjectDetector:
 
                             # Only create a sprite thumbnail for the first sighting
                             # of an object; reuse it for all future detections.
+                            # Use the full frame (not the cropped object region) so
+                            # the thumbnail is a complete screenshot; the bbox
+                            # remains in original video coordinates.
                             if obj_id in self.object_sprite_refs:
                                 sprite_reference = self.object_sprite_refs[obj_id]
                             else:
                                 fragment_id = self.sprite_generator.add_thumbnail(
-                                    object_region, obj_id, frame_idx
+                                    frame, obj_id, frame_idx
                                 )
                                 sprite_reference = f"sprite.jpg{fragment_id}"  # Just filename + fragment
                                 self.object_sprite_refs[obj_id] = sprite_reference
