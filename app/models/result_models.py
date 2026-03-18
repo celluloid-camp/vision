@@ -4,7 +4,14 @@ from enum import Enum
 from typing import Annotated, Literal, Optional, Union
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, Discriminator, Field, Tag, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    Discriminator,
+    Field,
+    Tag,
+    field_validator,
+    model_validator,
+)
 
 
 # ---------------------------------------------------------------------------
