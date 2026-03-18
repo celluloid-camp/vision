@@ -3,6 +3,16 @@
 This changelog is auto generated using release-it.
 
 
+## [1.9.0](https://github.com/celluloid-camp/vision/compare/v1.8.0...v1.9.0) (2026-03-18)
+
+### Features
+
+* Enhance API response models with result type discrimination for object and scene detection, update version to 1.7.0, and improve flower command directory handling ([b6c2383](https://github.com/celluloid-camp/vision/commit/b6c238391cd65f86cc6d356ee87aa1a6d26a7044))
+
+### Code Style Changes
+
+* Refactor import statements in result_models.py for improved readability ([8208aff](https://github.com/celluloid-camp/vision/commit/8208aff5369d4c242df0e4a9f52f5bfd8be97f65))
+
 ## [1.8.0](https://github.com/celluloid-camp/vision/compare/v1.7.0...v1.8.0) (2026-03-18)
 
 ### Features
