@@ -3,6 +3,16 @@
 This changelog is auto generated using release-it.
 
 
+## [1.10.0](https://github.com/celluloid-camp/vision/compare/v1.9.0...v1.10.0) (2026-03-18)
+
+### Features
+
+* Add job_type field to API models and update version to 1.8.0; modify Dockerfile to streamline file copying ([458bed0](https://github.com/celluloid-camp/vision/commit/458bed0eee3f17ea15124a8ef635659d26d4a00e))
+
+### Bug Fixes
+
+* Improve error handling in object and scene detection tasks by formatting callback parameters for consistency ([ae25eca](https://github.com/celluloid-camp/vision/commit/ae25eca9cd500c235766afba42b3c7cf574c8b61))
+
 ## [1.9.0](https://github.com/celluloid-camp/vision/compare/v1.8.0...v1.9.0) (2026-03-18)
 
 ### Features
