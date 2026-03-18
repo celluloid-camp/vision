@@ -178,6 +178,8 @@ def process_object_detect_task(self, job_data: dict):
             video_path, video_url, progress_callback=progress_cb
         )
 
+        results["result_type"] = "object_detect"
+
         sprite_meta = results.get("metadata", {}).get("sprite")
         if sprite_meta:
             base_url = os.getenv("BASE_URL", "").rstrip("/")
@@ -325,6 +327,7 @@ def process_scene_detect_task(self, job_data: dict):
             )
 
         result_data = scene_result.model_dump()
+        result_data["result_type"] = "scene_detect"
 
         with open(output_path, "w") as f:
             json.dump(result_data, f, indent=2)

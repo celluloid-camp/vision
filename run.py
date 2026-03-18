@@ -56,7 +56,9 @@ def worker_command() -> list[str]:
 
 def flower_command() -> list[str]:
     flower_port = os.getenv("FLOWER_PORT", "5555")
-    flower_db = os.getenv("FLOWER_DB", "/app/flower/flower.db")
+    default_flower_dir = os.path.join(os.path.dirname(__file__), ".flower")
+    os.makedirs(default_flower_dir, exist_ok=True)
+    flower_db = os.getenv("FLOWER_DB", os.path.join(default_flower_dir, "flower.db"))
     flower_persistent = os.getenv("FLOWER_PERSISTENT", "true").lower()
     return [
         sys.executable,

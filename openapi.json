@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Celluloid Video Analysis API",
-    "version": "1.6.0"
+    "version": "1.7.0"
   },
   "paths": {
     "/health": {
@@ -392,6 +392,12 @@
       },
       "DetectionResultsModel": {
         "properties": {
+          "result_type": {
+            "type": "string",
+            "const": "object_detect",
+            "title": "Result Type",
+            "default": "object_detect"
+          },
           "version": {
             "type": "string",
             "title": "Version"
@@ -596,10 +602,21 @@
           "data": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DetectionResultsModel"
-              },
-              {
-                "$ref": "#/components/schemas/SceneDetectResultsModel"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/DetectionResultsModel"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SceneDetectResultsModel"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "result_type",
+                  "mapping": {
+                    "object_detect": "#/components/schemas/DetectionResultsModel",
+                    "scene_detect": "#/components/schemas/SceneDetectResultsModel"
+                  }
+                }
               },
               {
                 "type": "null"
@@ -882,6 +899,12 @@
       },
       "SceneDetectResultsModel": {
         "properties": {
+          "result_type": {
+            "type": "string",
+            "const": "scene_detect",
+            "title": "Result Type",
+            "default": "scene_detect"
+          },
           "total_scenes": {
             "type": "integer",
             "title": "Total Scenes"

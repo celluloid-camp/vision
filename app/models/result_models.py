@@ -1,10 +1,10 @@
 import ipaddress
 import os
 from enum import Enum
-from typing import Optional, Union
+from typing import Annotated, Literal, Optional, Union
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Discriminator, Field, Tag, field_validator, model_validator
 
 
 # ---------------------------------------------------------------------------
@@ -229,6 +229,7 @@ class ResultsMetadataModel(BaseModel):
 
 
 class DetectionResultsModel(BaseModel):
+    result_type: Literal["object_detect"] = "object_detect"
     version: str
     metadata: ResultsMetadataModel
     frames: list[DetectionFrameModel]
@@ -250,6 +251,7 @@ class SceneInfoModel(BaseModel):
 
 
 class SceneDetectResultsModel(BaseModel):
+    result_type: Literal["scene_detect"] = "scene_detect"
     total_scenes: int
     scenes: list[SceneInfoModel]
     sprite_url: Optional[str] = None
@@ -261,8 +263,17 @@ class SceneDetectResultsModel(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+ResultData = Annotated[
+    Union[
+        Annotated[DetectionResultsModel, Tag("object_detect")],
+        Annotated[SceneDetectResultsModel, Tag("scene_detect")],
+    ],
+    Discriminator("result_type"),
+]
+
+
 class JobResultsResponse(BaseModel):
     status: str
     job_type: Optional[str] = None
-    data: Optional[Union[DetectionResultsModel, SceneDetectResultsModel]] = None
+    data: Optional[ResultData] = None
     error_message: Optional[str] = None
