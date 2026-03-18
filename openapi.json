@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Celluloid Video Analysis API",
-    "version": "1.7.0"
+    "version": "1.8.0"
   },
   "paths": {
     "/health": {
@@ -563,6 +563,10 @@
             "type": "string",
             "title": "External Id"
           },
+          "job_type": {
+            "type": "string",
+            "title": "Job Type"
+          },
           "status": {
             "type": "string",
             "title": "Status"
@@ -577,6 +581,7 @@
         "required": [
           "job_id",
           "external_id",
+          "job_type",
           "status",
           "timestamp"
         ],

@@ -22,12 +22,13 @@ logger = logging.getLogger(__name__)
 
 
 def _send_callback_sync(
-    job_id, external_id, callback_url, status, results=None, error=None
+    job_id, external_id, job_type, callback_url, status, results=None, error=None
 ):
     """Send callback notification synchronously with retry logic"""
     callback_data = {
         "job_id": job_id,
         "external_id": external_id,
+        "job_type": job_type,
         "status": status,
         "timestamp": datetime.now().isoformat(),
     }
@@ -208,6 +209,7 @@ def process_object_detect_task(self, job_data: dict):
             _send_callback_sync(
                 job_id,
                 external_id,
+                "object_detect",
                 callback_url,
                 "completed",
                 {"result_path": output_path, "metadata": metadata},
@@ -235,7 +237,7 @@ def process_object_detect_task(self, job_data: dict):
 
         if callback_url:
             _send_callback_sync(
-                job_id, external_id, callback_url, "failed", error=error_msg
+                job_id, external_id, "object_detect", callback_url, "failed", error=error_msg
             )
 
         raise
@@ -346,6 +348,7 @@ def process_scene_detect_task(self, job_data: dict):
             _send_callback_sync(
                 job_id,
                 external_id,
+                "scene_detect",
                 callback_url,
                 "completed",
                 {"result_path": output_path, "metadata": metadata},
@@ -373,7 +376,7 @@ def process_scene_detect_task(self, job_data: dict):
 
         if callback_url:
             _send_callback_sync(
-                job_id, external_id, callback_url, "failed", error=error_msg
+                job_id, external_id, "scene_detect", callback_url, "failed", error=error_msg
             )
 
         raise

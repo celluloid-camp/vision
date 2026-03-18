@@ -112,6 +112,7 @@ app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
 class JobCompletedWebhook(BaseModel):
     job_id: str
     external_id: str
+    job_type: str
     status: str
     timestamp: datetime
 

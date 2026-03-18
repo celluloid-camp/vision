@@ -42,7 +42,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 # Copy dependency files and package structure for better caching
 COPY pyproject.toml README.md ./
 COPY app ./app
-COPY analyse.py run.py entrypoint.sh ./
+COPY run.py entrypoint.sh ./
 
 # Install Python dependencies using uv
 RUN uv pip install --system --no-cache -e .
