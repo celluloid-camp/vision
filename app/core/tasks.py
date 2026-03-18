@@ -237,7 +237,12 @@ def process_object_detect_task(self, job_data: dict):
 
         if callback_url:
             _send_callback_sync(
-                job_id, external_id, "object_detect", callback_url, "failed", error=error_msg
+                job_id,
+                external_id,
+                "object_detect",
+                callback_url,
+                "failed",
+                error=error_msg,
             )
 
         raise
@@ -376,7 +381,12 @@ def process_scene_detect_task(self, job_data: dict):
 
         if callback_url:
             _send_callback_sync(
-                job_id, external_id, "scene_detect", callback_url, "failed", error=error_msg
+                job_id,
+                external_id,
+                "scene_detect",
+                callback_url,
+                "failed",
+                error=error_msg,
             )
 
         raise
