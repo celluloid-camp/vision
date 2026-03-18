@@ -3,6 +3,16 @@
 This changelog is auto generated using release-it.
 
 
+## [1.6.0](https://github.com/celluloid-camp/vision/compare/v1.5.2...v1.6.0) (2026-03-08)
+
+### Features
+
+* Refactor detection modules and enhance Celery integration ([aff35bd](https://github.com/celluloid-camp/vision/commit/aff35bdd1c153e75d868c8787e04f9110d4fbc23))
+
+### Code Style Changes
+
+* Improve code formatting in Celery job manager and scene detection modules ([43b5a3d](https://github.com/celluloid-camp/vision/commit/43b5a3d15844c31f944fc2cbe08f73f8d44827a8))
+
 ## [1.5.2](https://github.com/celluloid-camp/vision/compare/v1.5.1...v1.5.2) (2026-02-24)
 
 ## [1.5.1](https://github.com/celluloid-camp/vision/compare/v1.5.0...v1.5.1) (2026-02-24)
