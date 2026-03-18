@@ -3,6 +3,12 @@
 This changelog is auto generated using release-it.
 
 
+## [1.8.0](https://github.com/celluloid-camp/vision/compare/v1.7.0...v1.8.0) (2026-03-18)
+
+### Features
+
+* Update API to version 1.6.0 with job creation endpoint and enhanced job status responses ([8bb853a](https://github.com/celluloid-camp/vision/commit/8bb853a61bcfc74463a1d937efad4d25abb8e2e3))
+
 ## [1.7.0](https://github.com/celluloid-camp/vision/compare/v1.6.0...v1.7.0) (2026-03-18)
 
 ### Features
