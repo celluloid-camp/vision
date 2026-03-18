@@ -3,6 +3,20 @@
 This changelog is auto generated using release-it.
 
 
+## [1.7.0](https://github.com/celluloid-camp/vision/compare/v1.6.0...v1.7.0) (2026-03-18)
+
+### Features
+
+* Add job creation endpoint and enhance detection parameters ([386dfec](https://github.com/celluloid-camp/vision/commit/386dfec24cb298dc5d6880531cbe65e5498ede6f))
+
+### Bug Fixes
+
+* Update object detection thumbnail generation to use full frame for complete screenshots ([bb57f8a](https://github.com/celluloid-camp/vision/commit/bb57f8a4bce7b5b47954b4bf6fa4ec2d854e0a91))
+
+### Chores
+
+* Update .gitignore to include .data/ directory and remove CELERY_VISIBILITY_TIMEOUT from deploy script ([9a114c5](https://github.com/celluloid-camp/vision/commit/9a114c5dbf968e7d3e929f6fc60d036bd605e41a))
+
 ## [1.6.0](https://github.com/celluloid-camp/vision/compare/v1.5.2...v1.6.0) (2026-03-08)
 
 ### Features
