@@ -5,13 +5,17 @@ from app.models.schemas import (
     JobStatus,
 )
 from app.models.result_models import (
-    HealthResponse,
-    AnalysisRequest,
-    AnalysisResponse,
-    JobStatusResponse,
+    CreateJobRequest,
+    CreateJobResponse,
     DetectionResultsModel,
+    HealthResponse,
     JobResultsResponse,
     JobStats,
+    JobStatusResponse,
+    JobType,
+    ObjectDetectParams,
+    SceneDetectParams,
+    SceneDetectResultsModel,
 )
 
 __all__ = [
@@ -19,11 +23,15 @@ __all__ = [
     "DetectionResults",
     "JobStatus",
     # From result_models
-    "HealthResponse",
-    "AnalysisRequest",
-    "AnalysisResponse",
-    "JobStatusResponse",
+    "CreateJobRequest",
+    "CreateJobResponse",
     "DetectionResultsModel",
+    "HealthResponse",
     "JobResultsResponse",
     "JobStats",
+    "JobStatusResponse",
+    "JobType",
+    "ObjectDetectParams",
+    "SceneDetectParams",
+    "SceneDetectResultsModel",
 ]

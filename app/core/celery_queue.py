@@ -14,6 +14,11 @@ logger = logging.getLogger(__name__)
 
 ESTIMATED_MINUTES_PER_JOB = 5
 
+TASK_NAME_BY_JOB_TYPE = {
+    "object_detect": "app.core.tasks.process_object_detect_task",
+    "scene_detect": "app.core.tasks.process_scene_detect_task",
+}
+
 
 class CeleryJobManager:
     def __init__(self, queue_name: str = CELERY_QUEUE_NAME):
@@ -54,8 +59,9 @@ class CeleryJobManager:
             job_id=job_id,
             external_id=payload.get("external_id", "unknown"),
             video_url=payload.get("video_url", "unknown"),
-            similarity_threshold=float(payload.get("similarity_threshold", 0.0)),
+            job_type=payload.get("job_type", "object_detect"),
             callback_url=payload.get("callback_url"),
+            params=payload.get("params"),
         )
         job.status = status
         job.progress = progress
@@ -187,26 +193,33 @@ class CeleryJobManager:
             }
 
     def enqueue_job(self, job: JobStatus):
-        """Enqueue a job to the Celery queue."""
+        """Enqueue a job to the Celery queue, routing to the correct task."""
         try:
-            from app.core.tasks import process_video_task
+            task_name = TASK_NAME_BY_JOB_TYPE.get(job.job_type)
+            if not task_name:
+                raise ValueError(f"Unknown job_type: {job.job_type}")
 
             job_data = {
                 "job_id": job.job_id,
                 "external_id": job.external_id,
                 "video_url": job.video_url,
-                "similarity_threshold": job.similarity_threshold,
+                "job_type": job.job_type,
                 "callback_url": job.callback_url,
+                "params": job.params,
             }
 
-            result = process_video_task.apply_async(
+            result = celery_app.send_task(
+                task_name,
                 args=[job_data],
                 task_id=job.job_id,
                 queue=self.queue_name,
             )
 
             logger.info(
-                "Enqueued job %s to Celery queue %s", job.job_id, self.queue_name
+                "Enqueued %s job %s to Celery queue %s",
+                job.job_type,
+                job.job_id,
+                self.queue_name,
             )
             return result
         except Exception as e:

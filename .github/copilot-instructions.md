@@ -281,7 +281,7 @@ uv run python test_web_service.py
 
 ### Modifying Detection Parameters
 1. Update function signatures in `object_detect.py`
-2. Update `AnalysisRequest` model in `result_models.py`
+2. Update request models (`ObjectDetectRequest` / `SceneDetectRequest`) in `result_models.py`
 3. Update API documentation in `Api.md`
 4. Update or add tests in `test_web_service.py` to validate new parameters
 5. Test with various parameter values to ensure backward compatibility

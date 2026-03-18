@@ -37,6 +37,7 @@ class ObjectDetector:
         output_path: str = "detections.json",
         similarity_threshold: float = 0.5,
         external_id: str = None,
+        analysis_fps: float = 1.0,
     ):
         # Initialize MediaPipe Object Detection
         model_path = get_model_path("detector")
@@ -58,6 +59,7 @@ class ObjectDetector:
         self.tracker = ObjectTracker(similarity_threshold)
         self.output_path = output_path
         self.external_id = external_id
+        self.analysis_fps = analysis_fps
         self.results = None
         self.start_time = None
         self.frame_count = 0
@@ -147,12 +149,14 @@ class ObjectDetector:
                     "source": video_source_url if video_source_url else video_path,
                 },
                 "sprite": {
-                    "path": "sprite.jpg",  # Just the filename, no path
+                    "url": "sprite.jpg",
                     "thumbnail_size": [160, 90],
                 },
             },
             "frames": [],
         }
+
+        frame_interval = max(1, int(round(fps / self.analysis_fps)))
 
         frame_idx = 0
         consecutive_failures = 0
@@ -164,13 +168,20 @@ class ObjectDetector:
                 consecutive_failures += 1
                 if consecutive_failures >= max_failures:
                     break
-                time.sleep(0.1)  # Wait a bit before retrying
+                time.sleep(0.1)
                 continue
 
-            consecutive_failures = 0  # Reset on successful frame read
+            consecutive_failures = 0
+
+            if frame_idx % frame_interval != 0:
+                frame_idx += 1
+                self.processed_frames = frame_idx
+                progress = (frame_idx / self.frame_count) * 100
+                if progress_callback:
+                    progress_callback(progress)
+                continue
 
             try:
-                # Calculate timestamp in milliseconds
                 timestamp = int(frame_idx * (1000 / fps))
 
                 # Ensure timestamp is monotonically increasing
@@ -298,7 +309,7 @@ class ObjectDetector:
         processing_time = end_time - self.start_time
 
         # Update sprite path in results metadata
-        self.results["metadata"]["sprite"]["path"] = sprite_output_path
+        self.results["metadata"]["sprite"]["url"] = sprite_output_path
 
         # Add processing time to results (removed images_dir field)
         self.results["metadata"]["processing"] = {
@@ -371,6 +382,13 @@ def main():
         default=0.5,
     )
     parser.add_argument(
+        "--fps",
+        "-f",
+        type=float,
+        help="Frames per second to analyse (default 1)",
+        default=1.0,
+    )
+    parser.add_argument(
         "--log-level", "-l", type=str, help="Logging level", default="INFO"
     )
     args = parser.parse_args()
@@ -392,6 +410,7 @@ def main():
             min_score=args.min_score,
             output_path=args.output,
             similarity_threshold=args.similarity_threshold,
+            analysis_fps=args.fps,
         )
         results = detector.process_video(video_path, video_source_url=args.video_url)
 

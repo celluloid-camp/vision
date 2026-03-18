@@ -1,9 +1,63 @@
 import ipaddress
 import os
-from typing import Optional
+from enum import Enum
+from typing import Optional, Union
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+
+class JobType(str, Enum):
+    object_detect = "object_detect"
+    scene_detect = "scene_detect"
+
+
+def _validate_video_url(v: str) -> str:
+    result = urlparse(v)
+    if (result.scheme in ("http", "https") and result.netloc) or os.path.exists(v):
+        return v
+    raise ValueError("video_url must be a valid URL or an existing file path")
+
+
+def _validate_callback_url(v: Optional[str]) -> Optional[str]:
+    if v is None:
+        return v
+    result = urlparse(v)
+    if result.scheme not in ("http", "https"):
+        raise ValueError("callback_url must use http or https scheme")
+    if not result.netloc:
+        raise ValueError("callback_url must have a valid host")
+    hostname = result.hostname
+    if hostname is None:
+        raise ValueError("callback_url must have a valid host")
+    if hostname.lower() == "localhost":
+        raise ValueError("callback_url must not point to a private or loopback address")
+    try:
+        addr = ipaddress.ip_address(hostname)
+    except ValueError:
+        pass
+    else:
+        if (
+            addr.is_private
+            or addr.is_loopback
+            or addr.is_link_local
+            or addr.is_multicast
+            or addr.is_reserved
+        ):
+            raise ValueError(
+                "callback_url must not point to a private or loopback address"
+            )
+    return v
+
+
+# ---------------------------------------------------------------------------
+# Health
+# ---------------------------------------------------------------------------
 
 
 class JobStats(BaseModel):
@@ -13,7 +67,6 @@ class JobStats(BaseModel):
     failed: int
 
 
-# --- Pydantic models for OpenAPI ---
 class HealthResponse(BaseModel):
     version: str
     status: str
@@ -22,62 +75,86 @@ class HealthResponse(BaseModel):
     error: Optional[str] = None
 
 
-class AnalysisRequest(BaseModel):
-    external_id: str = Field(..., description="Project identifier")
-    video_url: str = Field(..., description="URL or path to video file")
+# ---------------------------------------------------------------------------
+# Job-type-specific parameter models
+# ---------------------------------------------------------------------------
+
+
+class ObjectDetectParams(BaseModel):
     similarity_threshold: float = Field(
         0.5, ge=0, le=1, description="Similarity threshold for object tracking"
     )
+    analysis_fps: float = Field(
+        1.0, gt=0, le=60, description="Frames per second to analyse (default 1)"
+    )
+
+
+class SceneDetectParams(BaseModel):
+    threshold: float = Field(
+        30.0, gt=0, description="Content detection sensitivity threshold"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Create-job request (single model, params validated by job_type)
+# ---------------------------------------------------------------------------
+
+
+class CreateJobRequest(BaseModel):
+    job_type: JobType
+    external_id: str = Field(..., description="Project identifier")
+    video_url: str = Field(..., description="URL or path to video file")
     callback_url: Optional[str] = Field(
         None, description="Callback URL for job completion notifications"
     )
+    params: Union[ObjectDetectParams, SceneDetectParams] = Field(
+        default_factory=ObjectDetectParams
+    )
 
-    @field_validator("video_url")
+    _validate_video_url = field_validator("video_url")(_validate_video_url)
+    _validate_callback_url = field_validator("callback_url")(_validate_callback_url)
+
+    @model_validator(mode="before")
     @classmethod
-    def validate_video_url(cls, v):
-        result = urlparse(v)
-        if (result.scheme in ("http", "https") and result.netloc) or os.path.exists(v):
-            return v
-        raise ValueError("video_url must be a valid URL or an existing file path")
-
-    @field_validator("callback_url")
-    @classmethod
-    def validate_callback_url(cls, v):
-        if v is None:
-            return v
-        result = urlparse(v)
-        if result.scheme not in ("http", "https"):
-            raise ValueError("callback_url must use http or https scheme")
-        if not result.netloc:
-            raise ValueError("callback_url must have a valid host")
-        hostname = result.hostname
-        if hostname is None:
-            raise ValueError("callback_url must have a valid host")
-        if hostname.lower() == "localhost":
-            raise ValueError("callback_url must not point to a private or loopback address")
-        # Note: domain names that resolve to private IPs are not blocked here.
-        # Only literal IP addresses are checked to avoid DNS-based bypasses via latency.
-        try:
-            addr = ipaddress.ip_address(hostname)
-        except ValueError:
-            pass
-        else:
-            if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_multicast or addr.is_reserved:
-                raise ValueError("callback_url must not point to a private or loopback address")
-        return v
+    def coerce_params_by_job_type(cls, data):
+        """Parse params dict into the correct model based on job_type."""
+        if not isinstance(data, dict):
+            return data
+        job_type = data.get("job_type")
+        raw_params = data.get("params")
+        if raw_params is None:
+            raw_params = {}
+        if isinstance(raw_params, dict):
+            if job_type == "scene_detect":
+                data["params"] = SceneDetectParams(**raw_params)
+            else:
+                data["params"] = ObjectDetectParams(**raw_params)
+        return data
 
 
-class AnalysisResponse(BaseModel):
+# ---------------------------------------------------------------------------
+# Create-job response
+# ---------------------------------------------------------------------------
+
+
+class CreateJobResponse(BaseModel):
     job_id: str
+    job_type: JobType
     status: str
     queue_position: int
     message: str
     callback_url: Optional[str] = None
 
 
+# ---------------------------------------------------------------------------
+# Job status response
+# ---------------------------------------------------------------------------
+
+
 class JobStatusResponse(BaseModel):
     job_id: str
     external_id: str
+    job_type: Optional[str] = None
     status: str
     progress: float
     queue_position: int = 0
@@ -87,7 +164,11 @@ class JobStatusResponse(BaseModel):
     error_message: Optional[str] = None
 
 
-# Pydantic models for OpenAPI schema (matching TypedDict structure)
+# ---------------------------------------------------------------------------
+# Object-detect result models
+# ---------------------------------------------------------------------------
+
+
 class BoundingBoxModel(BaseModel):
     x: int
     y: int
@@ -118,7 +199,7 @@ class VideoMetadataModel(BaseModel):
 
 
 class SpriteMetadataModel(BaseModel):
-    path: str
+    url: str
     thumbnail_size: list[int]
 
 
@@ -153,7 +234,35 @@ class DetectionResultsModel(BaseModel):
     frames: list[DetectionFrameModel]
 
 
+# ---------------------------------------------------------------------------
+# Scene-detect result models
+# ---------------------------------------------------------------------------
+
+
+class SceneInfoModel(BaseModel):
+    scene_id: int
+    start_time: str
+    end_time: str
+    start_seconds: float
+    end_seconds: float
+    duration_seconds: float
+    sprite_fragment: Optional[str] = None
+
+
+class SceneDetectResultsModel(BaseModel):
+    total_scenes: int
+    scenes: list[SceneInfoModel]
+    sprite_url: Optional[str] = None
+    sprite_fragments: Optional[list[str]] = None
+
+
+# ---------------------------------------------------------------------------
+# Job results response (polymorphic data)
+# ---------------------------------------------------------------------------
+
+
 class JobResultsResponse(BaseModel):
     status: str
-    data: Optional[DetectionResultsModel] = None
+    job_type: Optional[str] = None
+    data: Optional[Union[DetectionResultsModel, SceneDetectResultsModel]] = None
     error_message: Optional[str] = None

@@ -12,9 +12,13 @@ import requests
 
 from app.core.celery_app import celery_app
 from app.core.utils import download_video
-from app.detection.object_detect import ObjectDetector
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
 
 
 def _send_callback_sync(
@@ -68,13 +72,70 @@ def _send_callback_sync(
     logger.error(f"All callback attempts failed for job {job_id} to {callback_url}")
 
 
-@celery_app.task(bind=True, name="app.core.tasks.process_video_task")
-def process_video_task(self, job_data: dict):
-    """Celery task for processing a video detection job"""
+def _download_and_validate_video(video_url: str) -> str:
+    """Download (if remote) and validate a video file. Returns local path."""
+    if video_url.startswith(("http://", "https://")):
+        video_path = download_video(video_url)
+    else:
+        video_path = video_url
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise ValueError("Video file not valid")
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if frame_count == 0:
+        raise ValueError(
+            f"Video contains no video stream. It may be audio-only: {video_path}"
+        )
+    cap.release()
+    return video_path
+
+
+def _cleanup_video(video_url: str, video_path: str) -> None:
+    """Remove downloaded video if it was a remote URL."""
+    if video_url.startswith(("http://", "https://")):
+        try:
+            os.remove(video_path)
+            logger.info(f"Cleaned up temporary video file: {video_path}")
+        except Exception as e:
+            logger.warning(f"Failed to clean up temporary video file: {str(e)}")
+
+
+def _make_progress_reporter(task, job_id, external_id, start_time):
+    """Create a throttled progress callback for Celery state updates."""
+    last_reported = [0.0]
+
+    def _report(pct: float):
+        if pct - last_reported[0] >= 5.0 or pct >= 100.0:
+            last_reported[0] = pct
+            task.update_state(
+                state="PROCESSING",
+                meta={
+                    "job_id": job_id,
+                    "external_id": external_id,
+                    "status": "processing",
+                    "progress": round(pct, 1),
+                    "start_time": start_time,
+                },
+            )
+
+    return _report
+
+
+# ---------------------------------------------------------------------------
+# Object-detect task
+# ---------------------------------------------------------------------------
+
+
+@celery_app.task(bind=True, name="app.core.tasks.process_object_detect_task")
+def process_object_detect_task(self, job_data: dict):
+    """Celery task for object detection on a video."""
     job_id = job_data["job_id"]
     external_id = job_data["external_id"]
     video_url = job_data["video_url"]
-    similarity_threshold = float(job_data["similarity_threshold"])
+    params = job_data.get("params", {})
+    similarity_threshold = float(params.get("similarity_threshold", 0.5))
+    analysis_fps = float(params.get("analysis_fps", 1.0))
     callback_url = job_data.get("callback_url")
     start_time = datetime.now().isoformat()
 
@@ -84,7 +145,7 @@ def process_video_task(self, job_data: dict):
             "job_id": job_id,
             "external_id": external_id,
             "video_url": video_url,
-            "similarity_threshold": similarity_threshold,
+            "job_type": "object_detect",
             "callback_url": callback_url,
             "status": "processing",
             "progress": 0.0,
@@ -93,68 +154,42 @@ def process_video_task(self, job_data: dict):
     )
 
     try:
-        # Create output directory for this project
         output_dir = os.path.join("outputs", external_id)
         os.makedirs(output_dir, exist_ok=True)
 
-        # Generate output filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_filename = f"detections_{job_id}_{timestamp}.json"
         output_path = os.path.join(output_dir, output_filename)
 
-        # Download video if it's a URL
-        if video_url.startswith(("http://", "https://")):
-            video_path = download_video(video_url)
-        else:
-            video_path = video_url
+        video_path = _download_and_validate_video(video_url)
 
-        # Validate video
-        cap = cv2.VideoCapture(video_path)
-        if not cap.isOpened():
-            raise ValueError("Video file not valid")
-        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        if frame_count == 0:
-            raise ValueError(
-                f"Video contains no video stream. It may be audio-only: {video_path}"
-            )
-        cap.release()
+        from app.detection.object_detect import ObjectDetector
 
-        # Process the video
         detector = ObjectDetector(
             min_score=0.8,
             output_path=output_path,
             similarity_threshold=similarity_threshold,
             external_id=external_id,
+            analysis_fps=analysis_fps,
         )
 
-        _last_reported = [0.0]
-
-        def _report_progress(pct: float):
-            # Report at most once per 5% increment to limit Redis writes
-            if pct - _last_reported[0] >= 5.0 or pct >= 100.0:
-                _last_reported[0] = pct
-                self.update_state(
-                    state="PROCESSING",
-                    meta={
-                        "job_id": job_id,
-                        "external_id": external_id,
-                        "status": "processing",
-                        "progress": round(pct, 1),
-                        "start_time": start_time,
-                    },
-                )
-
+        progress_cb = _make_progress_reporter(self, job_id, external_id, start_time)
         results = detector.process_video(
-            video_path, video_url, progress_callback=_report_progress
+            video_path, video_url, progress_callback=progress_cb
         )
 
-        # Save results to disk
+        sprite_meta = results.get("metadata", {}).get("sprite")
+        if sprite_meta:
+            base_url = os.getenv("BASE_URL", "").rstrip("/")
+            sprite_meta["url"] = (
+                f"{base_url}/{sprite_meta['url']}" if base_url else sprite_meta["url"]
+            )
+
         with open(output_path, "w") as f:
             json.dump(results, f, indent=2)
 
         logger.info(f"Result file saved to: {output_path}")
 
-        # Extract metadata
         processing = results["metadata"]["processing"]
         detection_stats = processing["detection_statistics"]
         metadata = {
@@ -165,10 +200,8 @@ def process_video_task(self, job_data: dict):
         }
 
         end_time = datetime.now().isoformat()
-
         logger.info(f"Job {job_id} completed successfully")
 
-        # Send completion callback
         if callback_url:
             _send_callback_sync(
                 job_id,
@@ -178,19 +211,13 @@ def process_video_task(self, job_data: dict):
                 {"result_path": output_path, "metadata": metadata},
             )
 
-        # Clean up downloaded video
-        if video_url.startswith(("http://", "https://")):
-            try:
-                os.remove(video_path)
-                logger.info(f"Cleaned up temporary video file: {video_path}")
-            except Exception as e:
-                logger.warning(f"Failed to clean up temporary video file: {str(e)}")
+        _cleanup_video(video_url, video_path)
 
         return {
             "job_id": job_id,
             "external_id": external_id,
             "video_url": video_url,
-            "similarity_threshold": similarity_threshold,
+            "job_type": "object_detect",
             "callback_url": callback_url,
             "status": "completed",
             "result_path": output_path,
@@ -204,7 +231,143 @@ def process_video_task(self, job_data: dict):
         logger.error(f"Job {job_id} failed: {error_msg}")
         logger.error(traceback.format_exc())
 
-        # Send failure callback
+        if callback_url:
+            _send_callback_sync(
+                job_id, external_id, callback_url, "failed", error=error_msg
+            )
+
+        raise
+
+
+# ---------------------------------------------------------------------------
+# Scene-detect task
+# ---------------------------------------------------------------------------
+
+
+@celery_app.task(bind=True, name="app.core.tasks.process_scene_detect_task")
+def process_scene_detect_task(self, job_data: dict):
+    """Celery task for scene detection on a video."""
+    job_id = job_data["job_id"]
+    external_id = job_data["external_id"]
+    video_url = job_data["video_url"]
+    params = job_data.get("params", {})
+    threshold = float(params.get("threshold", 30.0))
+    callback_url = job_data.get("callback_url")
+    start_time = datetime.now().isoformat()
+
+    self.update_state(
+        state="PROCESSING",
+        meta={
+            "job_id": job_id,
+            "external_id": external_id,
+            "video_url": video_url,
+            "job_type": "scene_detect",
+            "callback_url": callback_url,
+            "status": "processing",
+            "progress": 0.0,
+            "start_time": start_time,
+        },
+    )
+
+    try:
+        output_dir = os.path.join("outputs", external_id)
+        os.makedirs(output_dir, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_filename = f"scenes_{job_id}_{timestamp}.json"
+        output_path = os.path.join(output_dir, output_filename)
+        sprite_path = os.path.join(
+            output_dir, f"scenes_{job_id}_{timestamp}.sprite.jpg"
+        )
+
+        video_path = _download_and_validate_video(video_url)
+
+        self.update_state(
+            state="PROCESSING",
+            meta={
+                "job_id": job_id,
+                "external_id": external_id,
+                "status": "processing",
+                "progress": 10.0,
+                "start_time": start_time,
+            },
+        )
+
+        from app.detection.scene_detect import detect_scenes_from_file
+
+        scene_result = detect_scenes_from_file(
+            video_path,
+            threshold=threshold,
+            export_sprite=True,
+            sprite_output_path=sprite_path,
+        )
+
+        if scene_result is None:
+            raise RuntimeError("Scene detection returned no results")
+
+        self.update_state(
+            state="PROCESSING",
+            meta={
+                "job_id": job_id,
+                "external_id": external_id,
+                "status": "processing",
+                "progress": 90.0,
+                "start_time": start_time,
+            },
+        )
+
+        if scene_result.sprite_url:
+            base_url = os.getenv("BASE_URL", "").rstrip("/")
+            scene_result.sprite_url = (
+                f"{base_url}/{scene_result.sprite_url}"
+                if base_url
+                else scene_result.sprite_url
+            )
+
+        result_data = scene_result.model_dump()
+
+        with open(output_path, "w") as f:
+            json.dump(result_data, f, indent=2)
+
+        logger.info(f"Scene result file saved to: {output_path}")
+
+        metadata = {
+            "total_scenes": scene_result.total_scenes,
+            "has_sprite": scene_result.sprite_url is not None,
+        }
+
+        end_time = datetime.now().isoformat()
+        logger.info(f"Job {job_id} completed successfully")
+
+        if callback_url:
+            _send_callback_sync(
+                job_id,
+                external_id,
+                callback_url,
+                "completed",
+                {"result_path": output_path, "metadata": metadata},
+            )
+
+        _cleanup_video(video_url, video_path)
+
+        return {
+            "job_id": job_id,
+            "external_id": external_id,
+            "video_url": video_url,
+            "job_type": "scene_detect",
+            "callback_url": callback_url,
+            "status": "completed",
+            "result_path": output_path,
+            "start_time": start_time,
+            "end_time": end_time,
+            "metadata": metadata,
+        }
+
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Job {job_id} failed: {error_msg}")
+        logger.error(traceback.format_exc())
+
         if callback_url:
             _send_callback_sync(
                 job_id, external_id, callback_url, "failed", error=error_msg

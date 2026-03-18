@@ -82,14 +82,16 @@ class JobStatus:
         job_id: str,
         external_id: str,
         video_url: str,
-        similarity_threshold: float,
+        job_type: str = "object_detect",
         callback_url: str = None,
+        params: Optional[Dict[str, Any]] = None,
     ):
         self.job_id = job_id
         self.external_id = external_id
         self.video_url = video_url
-        self.similarity_threshold = similarity_threshold
+        self.job_type = job_type
         self.callback_url = callback_url
+        self.params: Dict[str, Any] = params or {}
         self.status = "queued"  # queued, processing, completed, failed
         self.start_time: Optional[datetime] = None
         self.end_time: Optional[datetime] = None

@@ -42,6 +42,28 @@ def _wait_for_api(max_wait: int = 60) -> None:
     pytest.fail(f"API at {BASE_URL} did not become ready within {max_wait}s")
 
 
+def _object_detect_payload(**overrides) -> dict:
+    base = {
+        "job_type": "object_detect",
+        "external_id": "ci-test-project",
+        "video_url": "http://example.com/video.mp4",
+        "params": {"similarity_threshold": 0.5},
+    }
+    base.update(overrides)
+    return base
+
+
+def _scene_detect_payload(**overrides) -> dict:
+    base = {
+        "job_type": "scene_detect",
+        "external_id": "ci-test-project-scene",
+        "video_url": "http://example.com/video.mp4",
+        "params": {"threshold": 30.0},
+    }
+    base.update(overrides)
+    return base
+
+
 # ---------------------------------------------------------------------------
 # Session-scoped fixture: wait for the API to be up
 # ---------------------------------------------------------------------------
@@ -94,164 +116,221 @@ class TestDocs:
 
 
 # ---------------------------------------------------------------------------
-# POST /analyse – authentication
+# POST /job/create – authentication
 # ---------------------------------------------------------------------------
 
 
-class TestAnalyseAuth:
-    _valid_payload = {
-        "external_id": "ci-test-project",
-        "video_url": "http://localhost/fake-video.mp4",
-        "similarity_threshold": 0.5,
-    }
+class TestCreateJobAuth:
+    _valid_payload = _object_detect_payload()
 
-    def test_analyse_missing_api_key_returns_403(self):
-        r = requests.post(f"{BASE_URL}/job/analyse", json=self._valid_payload)
+    def test_create_missing_api_key_returns_403(self):
+        r = requests.post(f"{BASE_URL}/job/create", json=self._valid_payload)
         assert r.status_code == 403
 
-    def test_analyse_wrong_api_key_returns_401(self):
+    def test_create_wrong_api_key_returns_401(self):
         r = requests.post(
-            f"{BASE_URL}/job/analyse",
+            f"{BASE_URL}/job/create",
             json=self._valid_payload,
             headers={"x-api-key": "wrong-key"},
         )
         assert r.status_code == 401
 
-    def test_analyse_valid_api_key_returns_202(self):
+    def test_create_valid_api_key_returns_202(self):
         r = requests.post(
-            f"{BASE_URL}/job/analyse",
+            f"{BASE_URL}/job/create",
             json=self._valid_payload,
             headers=HEADERS_AUTH,
         )
-        # 202 Accepted – job enqueued (video URL validation may reject localhost)
         assert r.status_code in (202, 422)
 
 
 # ---------------------------------------------------------------------------
-# POST /analyse – request validation
+# POST /job/create – request validation
 # ---------------------------------------------------------------------------
 
 
-class TestAnalyseValidation:
-    def test_analyse_missing_external_id_returns_422(self):
+class TestCreateJobValidation:
+    def test_missing_external_id_returns_422(self):
         r = requests.post(
-            f"{BASE_URL}/job/analyse",
-            json={"video_url": "http://example.com/v.mp4"},
-            headers=HEADERS_AUTH,
-        )
-        assert r.status_code == 422
-
-    def test_analyse_missing_video_url_returns_422(self):
-        r = requests.post(
-            f"{BASE_URL}/job/analyse",
-            json={"external_id": "ci-proj"},
-            headers=HEADERS_AUTH,
-        )
-        assert r.status_code == 422
-
-    def test_analyse_invalid_similarity_threshold_returns_422(self):
-        r = requests.post(
-            f"{BASE_URL}/job/analyse",
+            f"{BASE_URL}/job/create",
             json={
+                "job_type": "object_detect",
+                "video_url": "http://example.com/v.mp4",
+            },
+            headers=HEADERS_AUTH,
+        )
+        assert r.status_code == 422
+
+    def test_missing_video_url_returns_422(self):
+        r = requests.post(
+            f"{BASE_URL}/job/create",
+            json={"job_type": "object_detect", "external_id": "ci-proj"},
+            headers=HEADERS_AUTH,
+        )
+        assert r.status_code == 422
+
+    def test_invalid_job_type_returns_422(self):
+        r = requests.post(
+            f"{BASE_URL}/job/create",
+            json={
+                "job_type": "invalid_type",
                 "external_id": "ci-proj",
                 "video_url": "http://example.com/v.mp4",
-                "similarity_threshold": 5.0,  # out of range [0, 1]
             },
             headers=HEADERS_AUTH,
         )
         assert r.status_code == 422
 
-    def test_analyse_invalid_video_url_returns_422(self):
+    def test_object_detect_invalid_similarity_threshold_returns_422(self):
         r = requests.post(
-            f"{BASE_URL}/job/analyse",
-            json={
-                "external_id": "ci-proj",
-                "video_url": "not-a-url-and-not-a-file",
-            },
+            f"{BASE_URL}/job/create",
+            json=_object_detect_payload(
+                external_id="ci-proj",
+                params={"similarity_threshold": 5.0},
+            ),
             headers=HEADERS_AUTH,
         )
         assert r.status_code == 422
 
-    def test_analyse_invalid_callback_url_scheme_returns_422(self):
+    def test_object_detect_invalid_analysis_fps_zero_returns_422(self):
         r = requests.post(
-            f"{BASE_URL}/job/analyse",
-            json={
-                "external_id": "ci-proj",
-                "video_url": "http://example.com/v.mp4",
-                "callback_url": "ftp://example.com/callback",
-            },
+            f"{BASE_URL}/job/create",
+            json=_object_detect_payload(
+                external_id="ci-proj",
+                params={"analysis_fps": 0},
+            ),
             headers=HEADERS_AUTH,
         )
         assert r.status_code == 422
 
-    def test_analyse_callback_url_localhost_returns_422(self):
+    def test_object_detect_invalid_analysis_fps_too_high_returns_422(self):
         r = requests.post(
-            f"{BASE_URL}/job/analyse",
-            json={
-                "external_id": "ci-proj",
-                "video_url": "http://example.com/v.mp4",
-                "callback_url": "http://localhost/callback",
-            },
+            f"{BASE_URL}/job/create",
+            json=_object_detect_payload(
+                external_id="ci-proj",
+                params={"analysis_fps": 100},
+            ),
             headers=HEADERS_AUTH,
         )
         assert r.status_code == 422
 
-    def test_analyse_callback_url_private_ip_returns_422(self):
+    def test_object_detect_valid_analysis_fps_accepted(self):
         r = requests.post(
-            f"{BASE_URL}/job/analyse",
-            json={
-                "external_id": "ci-proj",
-                "video_url": "http://example.com/v.mp4",
-                "callback_url": "http://192.168.1.1/callback",
-            },
+            f"{BASE_URL}/job/create",
+            json=_object_detect_payload(
+                external_id="ci-fps-test",
+                params={"similarity_threshold": 0.5, "analysis_fps": 5},
+            ),
+            headers=HEADERS_AUTH,
+        )
+        assert r.status_code in (202, 422)
+
+    def test_invalid_video_url_returns_422(self):
+        r = requests.post(
+            f"{BASE_URL}/job/create",
+            json=_object_detect_payload(
+                external_id="ci-proj",
+                video_url="not-a-url-and-not-a-file",
+            ),
             headers=HEADERS_AUTH,
         )
         assert r.status_code == 422
 
-    def test_analyse_callback_url_loopback_ip_returns_422(self):
+    def test_invalid_callback_url_scheme_returns_422(self):
         r = requests.post(
-            f"{BASE_URL}/job/analyse",
-            json={
-                "external_id": "ci-proj",
-                "video_url": "http://example.com/v.mp4",
-                "callback_url": "http://127.0.0.1/callback",
-            },
+            f"{BASE_URL}/job/create",
+            json=_object_detect_payload(
+                external_id="ci-proj",
+                callback_url="ftp://example.com/callback",
+            ),
             headers=HEADERS_AUTH,
         )
         assert r.status_code == 422
 
-    def test_analyse_valid_callback_url_accepted(self):
+    def test_callback_url_localhost_returns_422(self):
         r = requests.post(
-            f"{BASE_URL}/job/analyse",
-            json={
-                "external_id": "ci-callback-valid",
-                "video_url": "http://example.com/v.mp4",
-                "callback_url": "https://hooks.example.com/notify",
-            },
+            f"{BASE_URL}/job/create",
+            json=_object_detect_payload(
+                external_id="ci-proj",
+                callback_url="http://localhost/callback",
+            ),
             headers=HEADERS_AUTH,
         )
-        # 202 on success; 422 is also acceptable if video_url fails file-exists check
+        assert r.status_code == 422
+
+    def test_callback_url_private_ip_returns_422(self):
+        r = requests.post(
+            f"{BASE_URL}/job/create",
+            json=_object_detect_payload(
+                external_id="ci-proj",
+                callback_url="http://192.168.1.1/callback",
+            ),
+            headers=HEADERS_AUTH,
+        )
+        assert r.status_code == 422
+
+    def test_callback_url_loopback_ip_returns_422(self):
+        r = requests.post(
+            f"{BASE_URL}/job/create",
+            json=_object_detect_payload(
+                external_id="ci-proj",
+                callback_url="http://127.0.0.1/callback",
+            ),
+            headers=HEADERS_AUTH,
+        )
+        assert r.status_code == 422
+
+    def test_valid_callback_url_accepted(self):
+        r = requests.post(
+            f"{BASE_URL}/job/create",
+            json=_object_detect_payload(
+                external_id="ci-callback-valid",
+                callback_url="https://hooks.example.com/notify",
+            ),
+            headers=HEADERS_AUTH,
+        )
         assert r.status_code in (202, 422)
         if r.status_code == 202:
             assert r.json().get("callback_url") == "https://hooks.example.com/notify"
 
-    def test_analyse_response_shape(self):
-        """Valid request returns the expected JSON fields."""
+    def test_object_detect_response_shape(self):
         r = requests.post(
-            f"{BASE_URL}/job/analyse",
-            json={
-                "external_id": "ci-shape-test",
-                "video_url": "http://example.com/video.mp4",
-            },
+            f"{BASE_URL}/job/create",
+            json=_object_detect_payload(external_id="ci-shape-od"),
             headers=HEADERS_AUTH,
         )
-        # 202 or 422 (URL may not pass file-exists check); only validate shape on 202
         if r.status_code == 202:
             data = r.json()
+            assert data["job_type"] == "object_detect"
             assert "job_id" in data
             assert "status" in data
             assert "queue_position" in data
             assert "message" in data
+
+    def test_scene_detect_response_shape(self):
+        r = requests.post(
+            f"{BASE_URL}/job/create",
+            json=_scene_detect_payload(external_id="ci-shape-sd"),
+            headers=HEADERS_AUTH,
+        )
+        if r.status_code == 202:
+            data = r.json()
+            assert data["job_type"] == "scene_detect"
+            assert "job_id" in data
+            assert "status" in data
+
+    def test_scene_detect_default_params(self):
+        """scene_detect works without explicit params (defaults applied)."""
+        r = requests.post(
+            f"{BASE_URL}/job/create",
+            json={
+                "job_type": "scene_detect",
+                "external_id": "ci-scene-defaults",
+                "video_url": "http://example.com/video.mp4",
+            },
+            headers=HEADERS_AUTH,
+        )
+        assert r.status_code in (202, 422)
 
 
 # ---------------------------------------------------------------------------
@@ -259,29 +338,35 @@ class TestAnalyseValidation:
 # ---------------------------------------------------------------------------
 
 
+class TestJobStatusAuth:
+    def test_status_missing_api_key_returns_403(self):
+        r = requests.get(f"{BASE_URL}/status/{FAKE_JOB_ID}")
+        assert r.status_code == 403
+
+    def test_status_wrong_api_key_returns_401(self):
+        r = requests.get(
+            f"{BASE_URL}/status/{FAKE_JOB_ID}",
+            headers={"x-api-key": "wrong-key"},
+        )
+        assert r.status_code == 401
+
+
 class TestJobStatus:
     def test_status_nonexistent_job_returns_404(self):
-        r = requests.get(f"{BASE_URL}/status/{FAKE_JOB_ID}")
+        r = requests.get(f"{BASE_URL}/status/{FAKE_JOB_ID}", headers=HEADERS_AUTH)
         assert r.status_code == 404
 
     def test_status_returns_correct_shape(self):
-        """
-        Enqueue a job then immediately query its status.
-        The job will be in 'queued' state since no worker is running.
-        """
         r = requests.post(
-            f"{BASE_URL}/job/analyse",
-            json={
-                "external_id": "ci-status-test",
-                "video_url": "http://example.com/video.mp4",
-            },
+            f"{BASE_URL}/job/create",
+            json=_object_detect_payload(external_id="ci-status-test"),
             headers=HEADERS_AUTH,
         )
         if r.status_code != 202:
             pytest.skip("Could not enqueue job; skipping status shape test")
 
         job_id = r.json()["job_id"]
-        rs = requests.get(f"{BASE_URL}/status/{job_id}")
+        rs = requests.get(f"{BASE_URL}/status/{job_id}", headers=HEADERS_AUTH)
         assert rs.status_code == 200
         data = rs.json()
         assert data["job_id"] == job_id
@@ -290,56 +375,57 @@ class TestJobStatus:
         assert "progress" in data
         assert "queue_position" in data
         assert "estimated_wait_time" in data
-        assert "metadata" not in data
+        assert "job_type" in data
 
     def test_status_duplicate_project_returns_existing_job(self):
-        """Submitting the same external_id twice returns the same job_id."""
-        payload = {
-            "external_id": "ci-dedup-test",
-            "video_url": "http://example.com/video.mp4",
-        }
-        r1 = requests.post(
-            f"{BASE_URL}/job/analyse", json=payload, headers=HEADERS_AUTH
-        )
+        payload = _object_detect_payload(external_id="ci-dedup-test")
+        r1 = requests.post(f"{BASE_URL}/job/create", json=payload, headers=HEADERS_AUTH)
         if r1.status_code != 202:
             pytest.skip("Could not enqueue job; skipping deduplication test")
         job_id_1 = r1.json()["job_id"]
 
-        r2 = requests.post(
-            f"{BASE_URL}/job/analyse", json=payload, headers=HEADERS_AUTH
-        )
+        r2 = requests.post(f"{BASE_URL}/job/create", json=payload, headers=HEADERS_AUTH)
         assert r2.status_code == 202
         assert r2.json()["job_id"] == job_id_1
 
 
 # ---------------------------------------------------------------------------
-# GET /results/{job_id}
+# GET /job/{job_id}/results
 # ---------------------------------------------------------------------------
+
+
+class TestJobResultsAuth:
+    def test_results_missing_api_key_returns_403(self):
+        r = requests.get(f"{BASE_URL}/job/{FAKE_JOB_ID}/results")
+        assert r.status_code == 403
+
+    def test_results_wrong_api_key_returns_401(self):
+        r = requests.get(
+            f"{BASE_URL}/job/{FAKE_JOB_ID}/results",
+            headers={"x-api-key": "wrong-key"},
+        )
+        assert r.status_code == 401
 
 
 class TestJobResults:
     def test_results_nonexistent_job_returns_not_found_status(self):
-        r = requests.get(f"{BASE_URL}/job/{FAKE_JOB_ID}/results")
+        r = requests.get(f"{BASE_URL}/job/{FAKE_JOB_ID}/results", headers=HEADERS_AUTH)
         assert r.status_code == 200
         data = r.json()
         assert data["status"] == "not-found"
         assert data["data"] is None
 
     def test_results_response_has_status_and_data_fields(self):
-        """A queued job returns status=queued with data=null."""
         r = requests.post(
-            f"{BASE_URL}/job/analyse",
-            json={
-                "external_id": "ci-results-shape",
-                "video_url": "http://example.com/video.mp4",
-            },
+            f"{BASE_URL}/job/create",
+            json=_object_detect_payload(external_id="ci-results-shape"),
             headers=HEADERS_AUTH,
         )
         if r.status_code != 202:
             pytest.skip("Could not enqueue job; skipping results shape test")
 
         job_id = r.json()["job_id"]
-        rr = requests.get(f"{BASE_URL}/job/{job_id}/results")
+        rr = requests.get(f"{BASE_URL}/job/{job_id}/results", headers=HEADERS_AUTH)
         assert rr.status_code == 200
         data = rr.json()
         assert "status" in data

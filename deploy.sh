@@ -27,6 +27,7 @@ docker run -d \
     -v "$(pwd)/models:/app/models:ro" \
     -e REDIS_URL="redis://host.docker.internal:6379/0" \
     -e API_KEY="xxx" \
+    -e BASE_URL="http://localhost:8081" \
     -e CELERY_QUEUE_NAME="celluloid_video_processing" \
     -e CELERY_TASK_TIMEOUT="3000" \
     -e FLOWER_UNAUTHENTICATED_API="true" \
