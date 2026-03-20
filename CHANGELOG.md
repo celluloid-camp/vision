@@ -3,6 +3,13 @@
 This changelog is auto generated using release-it.
 
 
+## [1.10.1](https://github.com/celluloid-camp/vision/compare/v1.10.0...v1.10.1) (2026-03-20)
+
+### Chores
+
+* add workflow_dispatch trigger to release workflow ([7c35633](https://github.com/celluloid-camp/vision/commit/7c35633f8603f3cbd39cff0e35101f3ca905d1ce))
+* update Docker image name in build workflow ([6073b59](https://github.com/celluloid-camp/vision/commit/6073b59b6ef788fd58fa61e455155f17ce7785e9))
+
 ## [1.10.0](https://github.com/celluloid-camp/vision/compare/v1.9.0...v1.10.0) (2026-03-18)
 
 ### Features
